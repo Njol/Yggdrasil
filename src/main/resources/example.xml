@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<yggdrasil version="1">
+	<boolean>true</boolean>
+	<char>F</char>
+	<array id="0" type="int">
+		000000500000010
+	</array>
+	<object id="1" type="SomeClass">
+		<boolean name="enabled">false</boolean>
+		<long name="time">1382451118775</long>
+		<collection id="2" name="listeners" />
+		<constant id="3" name="mat" type="Material">GOLD_SWORD</constant>
+		<null name="parent" />
+		<reference name="list">0</reference>
+	</object>
+	<string id="4">&lt;an example string&gt;</string>
+	<collection id="5">
+		<Integer id="6">300</Integer>
+		<Double id="7">20.7</Double>
+		<reference>6</reference>
+	</collection>
+	<map id="8">
+		<entry>
+			<Integer id="9">5</Integer>
+			<string id="10">blah</string>
+		</entry>
+		<entry>
+			<reference>3</reference>
+			<string id="11">blah2</string>
+		</entry>
+	</map>
+</yggdrasil>

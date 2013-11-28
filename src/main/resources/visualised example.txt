@@ -1,0 +1,76 @@
+
+I_YGGDRASIL
+0x0001 # version
+
+T_BOOLEAN
+0x01
+
+T_CHAR
+0x0046
+
+T_ARRAY
+T_INT
+0x00000002
+	
+	0x00000005
+	
+	0x00000010
+
+T_OBJECT
+'SomeClass'
+0x00000005
+	
+	'enabled' # consists of <1 byte UTF-8 length> + <chars as UTF-8 bytes> OR <T_REFERENCE> + <int ref>
+	T_BOOLEAN
+	0x00
+	
+	'time'
+	T_LONG
+	0x00000141E08202B7
+	
+	'listeners'
+	T_COLLECTION
+	0x00000000
+	
+	'mat'
+	T_ENUM
+	'Material'
+	'GOLD_SWORD'
+	
+	'parent'
+	T_NULL
+	
+	'list'
+	T_REFERENCE
+	0x00000000 # first T_COLLECTION
+
+T_STRING
+"<an example string>"
+
+T_COLLECTION
+'ArrayList'
+0x00000003
+	
+	T_INT_OBJ
+	0x0000012C
+	
+	T_DOUBLE_OBJ
+	<20.7>
+	
+	T_REFERENCE
+	0x00000006 # first int in this list
+
+T_MAP
+'HashMap'
+0x0000002
+	
+	T_INT_OBJ
+	0x0000005
+		T_STRING
+		"blah"
+	
+	T_REFERENCE
+	0x00000003
+		T_STRING
+		"blah2"
+

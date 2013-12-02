@@ -59,12 +59,13 @@ public enum Tag {
 	/** primitive tags are between these value */
 	public final static int MIN_WRAPPER = T_BYTE_OBJ.tag, MAX_WRAPPER = T_BOOLEAN_OBJ.tag;
 	
-	public final int tag;
+	public final byte tag;
 	public final Class<?> c;
 	public final String name;
 	
 	private Tag(final int tag, final Class<?> c, final String name) {
-		this.tag = tag;
+		assert 0 <= tag && tag <= 0xFF : tag;
+		this.tag = (byte) tag;
 		this.c = c;
 		this.name = name;
 	}
@@ -104,7 +105,7 @@ public enum Tag {
 	static {
 		for (final Tag t : Tag.values()) {
 			types.put(t.c, t);
-			byID[t.tag] = t;
+			byID[t.tag & 0xFF] = t;
 			byName.put(t.name, t);
 		}
 	}
@@ -118,6 +119,10 @@ public enum Tag {
 		return c.isArray() ? T_ARRAY
 				: Enum.class.isAssignableFrom(c) ? T_ENUM // isEnum() doesn't work for subclasses
 				: T_OBJECT;
+	}
+	
+	public final static Tag byID(final byte tag) {
+		return byID[tag & 0xFF];
 	}
 	
 	public final static Tag byID(final int tag) {

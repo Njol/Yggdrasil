@@ -3,6 +3,7 @@ package ch.njol.yggdrasil;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.NotSerializableException;
 import java.io.StreamCorruptedException;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -105,12 +106,12 @@ public class YggdrasilTest {
 		}
 		
 		@Override
-		public Fields serialize() {
+		public Fields serialize() throws NotSerializableException {
 			return new Fields(this);
 		}
 		
 		@Override
-		public void deserialize(final Fields fields) throws StreamCorruptedException {
+		public void deserialize(final Fields fields) throws StreamCorruptedException, NotSerializableException {
 			fields.setFields(this, y);
 			assert !ok;
 			if (someFinalInt != DEFAULT)

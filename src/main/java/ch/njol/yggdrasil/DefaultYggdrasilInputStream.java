@@ -69,13 +69,14 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 		readFully(buf, 0, buf.length);
 	}
 	
-	private void readFully(final byte[] buf, int off, int len) throws IOException {
-		while (len > 0) {
-			final int n = in.read(buf, off, len);
+	private void readFully(final byte[] buf, int off, final int len) throws IOException {
+		int l = len;
+		while (l > 0) {
+			final int n = in.read(buf, off, l);
 			if (n < 0)
-				throw new EOFException();
+				throw new EOFException("Expected " + len + " bytes, but could only read " + (len - l));
 			off += n;
-			len -= n;
+			l -= n;
 		}
 	}
 	
@@ -83,7 +84,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 	
 	private String readShortString() throws IOException {
 		final int length = read();
-		if (length == T_REFERENCE.tag) {
+		if (length == (T_REFERENCE.tag & 0xFF)) {
 			final int i = readInt();
 			if (i < 0 || i > readShortStrings.size())
 				throw new StreamCorruptedException("Invalid short string reference " + i);

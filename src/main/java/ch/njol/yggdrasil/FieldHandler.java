@@ -32,8 +32,7 @@ public interface FieldHandler {
 	 * Called when a loaded field doesn't exist.
 	 * 
 	 * @param o The object whose filed is missing
-	 * @param name The name of the missing field
-	 * @param value The value loaded for the field
+	 * @param field The field read from stream
 	 * @return Whether this Handler handled the request
 	 */
 	public boolean missingField(Object o, FieldContext field) throws StreamCorruptedException;
@@ -43,7 +42,7 @@ public interface FieldHandler {
 	 * 
 	 * @param o The object the field belongs to
 	 * @param f The field to set
-	 * @param value The value that couldn't be stored in the field
+	 * @param field The field read from stream
 	 * @return Whether this Handler handled the request
 	 */
 	public boolean incompatibleFieldType(Object o, Field f, FieldContext field) throws StreamCorruptedException;

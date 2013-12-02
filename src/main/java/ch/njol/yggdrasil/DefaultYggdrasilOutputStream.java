@@ -61,7 +61,7 @@ public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
 			writeInt(writtenShortStrings.get(s));
 		} else {
 			final byte[] d = s.getBytes(utf8);
-			if (d.length >= T_REFERENCE.tag)
+			if (d.length >= (T_REFERENCE.tag & 0xFF))
 				throw new YggdrasilException("Field name or Class ID too long: " + s);
 			write(d.length);
 			out.write(d);

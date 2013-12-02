@@ -145,7 +145,7 @@ public abstract class YggdrasilInputStream implements Closeable {
 		final Tag t = readTag();
 		final Object o = readObject(t);
 		if (o != null && !expectedType.isInstance(o))
-			throw new StreamCorruptedException("Object " + o + " of " + o.getClass() + " but expected " + expectedType);
+			throw new StreamCorruptedException("Object " + o + " is of " + o.getClass() + " but expected " + expectedType);
 		return (T) o;
 	}
 	
@@ -156,8 +156,11 @@ public abstract class YggdrasilInputStream implements Closeable {
 		if (t == T_REFERENCE) {
 			final int ref = readReference();
 			if (ref < 0 || ref >= readObjects.size())
-				throw new StreamCorruptedException();
-			return readObjects.get(ref);
+				throw new StreamCorruptedException("Invalid reference " + ref + ", " + readObjects.size() + " object(s) read so far");
+			final Object o = readObjects.get(ref);
+			if (o == null)
+				throw new StreamCorruptedException("Reference to uninstantiable object: " + ref);
+			return o;
 		}
 		final Object o;
 		switch (t) {
@@ -181,10 +184,13 @@ public abstract class YggdrasilInputStream implements Closeable {
 				final Class<?> c = readObjectType();
 				final YggdrasilSerializer s = y.getSerializer(c);
 				if (s != null && !s.canBeInstantiated(c)) {
+					final int ref = readObjects.size();
+					readObjects.add(null);
 					final Fields fields = readFields();
 					o = s.deserialize(c, fields);
 					if (o == null)
-						throw new StreamCorruptedException("YggdrasilSerializer " + s + " returned null from deserialize(" + c + "," + fields + ")");
+						throw new YggdrasilException("YggdrasilSerializer " + s + " returned null from deserialize(" + c + "," + fields + ")");
+					readObjects.set(ref, o);
 				} else {
 					o = y.newInstance(c);
 					readObjects.add(o);
@@ -217,9 +223,11 @@ public abstract class YggdrasilInputStream implements Closeable {
 			case T_INT:
 			case T_LONG:
 			case T_SHORT:
+				throw new StreamCorruptedException();
 			case T_REFERENCE:
 			case T_NULL:
 			default:
+				assert false;
 				throw new StreamCorruptedException();
 		}
 		readObjects.add(o);

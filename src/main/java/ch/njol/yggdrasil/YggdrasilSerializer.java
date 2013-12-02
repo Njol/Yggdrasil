@@ -21,16 +21,18 @@
 
 package ch.njol.yggdrasil;
 
+import java.io.NotSerializableException;
 import java.io.StreamCorruptedException;
 
 /**
  * Utility to be able to save and load classes with Yggdrasil that the user has no control of, e.g. classes of an external API.
- * <p>
- * Please remember that only classes that have a public no.args constructor will be accepted by Yggdrasil to prevent any errors.
  * 
  * @author Peter Güttinger
  */
 public abstract class YggdrasilSerializer<T> implements ClassResolver {
+	
+	@Override
+	public abstract Class<? extends T> getClass(String id);
 	
 	/**
 	 * Serialises the given object.
@@ -39,16 +41,16 @@ public abstract class YggdrasilSerializer<T> implements ClassResolver {
 	 * 
 	 * @param o The object to serialise
 	 * @return A Fields object representing the object's fields to serialise. Must not be null.
-	 * @throws StreamCorruptedException
+	 * @throws NotSerializableException If this object could not be serialised
 	 */
-	public abstract Fields serialize(T o) throws StreamCorruptedException;
+	public abstract Fields serialize(T o) throws NotSerializableException;
 	
 	/**
 	 * Whether an instance of the given class can be dynamically created. If this method returns false, {@link #newInstance(Class)} and {@link #deserialize(Object, Fields)} will
-	 * not be called for the given class, but {@link #deserialize(Fields)} will be used instead, and having any reference to an object of the given class in its own fields' graph
-	 * will cause Yggdrasil to throw an exception upon serialisation as no reference to the object will be available when deserialising the object.
+	 * not be called for the given class, but {@link #deserialize(Class, Fields)} will be used instead, and having any reference to an object of the given class in its own fields'
+	 * graph will cause Yggdrasil to throw an exception upon serialisation as no reference to the object will be available when deserialising the object.
 	 * <p>
-	 * Please note that you must not change the return value of this function ever.
+	 * Please note that you must not change the return value of this function ever - it is not saved in the stream.
 	 * 
 	 * @param c The class to check
 	 * @return true by default
@@ -73,8 +75,9 @@ public abstract class YggdrasilSerializer<T> implements ClassResolver {
 	 * @param o The object to deserialise as returned by {@link #newInstance(Class)}.
 	 * @param fields The fields read from stream
 	 * @throws StreamCorruptedException If deserialisation failed because the data read from stream is incomplete or invalid.
+	 * @throws NotSerializableException
 	 */
-	public abstract void deserialize(T o, Fields fields) throws StreamCorruptedException;
+	public abstract void deserialize(T o, Fields fields) throws StreamCorruptedException, NotSerializableException;
 	
 	/**
 	 * Deserialises an object.
@@ -83,9 +86,11 @@ public abstract class YggdrasilSerializer<T> implements ClassResolver {
 	 * @param fields The fields read from stream
 	 * @return An object representing the read fields. Must not be null (throw an exception instead).
 	 * @throws StreamCorruptedException If deserialisation failed because the data read from stream is incomplete or invalid.
+	 * @throws NotSerializableException If the class is not serialisable
 	 */
-	public <E extends T> E deserialize(final Class<E> c, final Fields fields) throws StreamCorruptedException {
-		throw new StreamCorruptedException();
+	@SuppressWarnings("unused")
+	public <E extends T> E deserialize(final Class<E> c, final Fields fields) throws StreamCorruptedException, NotSerializableException {
+		throw new YggdrasilException(getClass() + " does not override deserialize(Class, Fields)");
 	}
 	
 }

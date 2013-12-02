@@ -21,12 +21,18 @@
 
 package ch.njol.yggdrasil;
 
+import java.io.NotSerializableException;
 import java.io.StreamCorruptedException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import ch.njol.yggdrasil.Fields.FieldContext; // required - wtf
 import ch.njol.yggdrasil.YggdrasilSerializable.YggdrasilRobustSerializable;
@@ -51,6 +57,10 @@ public final class Fields implements Iterable<FieldContext> {
 			name = f.getName();
 			value = f.get(o);
 			isPrimitiveValue = f.getType().isPrimitive();
+		}
+		
+		public String getName() {
+			return name;
 		}
 		
 		public boolean isPrimitive() {
@@ -86,26 +96,37 @@ public final class Fields implements Iterable<FieldContext> {
 			isPrimitiveValue = true;
 		}
 		
-		public void setField(final Object o, final Yggdrasil y) throws StreamCorruptedException {
-			final Field f = Yggdrasil.getField(o.getClass(), name);
-			if (f != null) {
-				if (Modifier.isStatic(f.getModifiers()))
-					throw new YggdrasilException("The field " + name + " of " + f.getDeclaringClass() + " is static");
-				if (f.getType().isPrimitive() != isPrimitiveValue)
-					throw new YggdrasilException("The field " + name + " of " + f.getDeclaringClass() + " is not primitive");
-				try {
-					f.setAccessible(true);
-					f.set(o, value);
-				} catch (final IllegalArgumentException e) {
-					if (!(o instanceof YggdrasilRobustSerializable) || !((YggdrasilRobustSerializable) o).incompatibleFieldType(f, this))
-						y.incompatibleFieldType(o, f, this);
-				} catch (final IllegalAccessException e) {
-					assert false;
-				}
-			} else {
-				if (!(o instanceof YggdrasilRobustSerializable) || !((YggdrasilRobustSerializable) o).missingField(this))
-					y.missingField(o, this);
+		public void setField(final Object o, final Field f, final Yggdrasil y) throws StreamCorruptedException {
+			if (Modifier.isStatic(f.getModifiers()))
+				throw new YggdrasilException("The field " + name + " of " + f.getDeclaringClass() + " is static");
+			if (f.getType().isPrimitive() != isPrimitiveValue)
+				throw new YggdrasilException("The field " + name + " of " + f.getDeclaringClass() + " is not primitive");
+			try {
+				f.setAccessible(true);
+				f.set(o, value);
+			} catch (final IllegalArgumentException e) {
+				if (!(o instanceof YggdrasilRobustSerializable) || !((YggdrasilRobustSerializable) o).incompatibleFieldType(f, this))
+					y.incompatibleFieldType(o, f, this);
+			} catch (final IllegalAccessException e) {
+				assert false;
 			}
+		}
+		
+		@Override
+		public int hashCode() {
+			return name.hashCode();
+		}
+		
+		@Override
+		public boolean equals(final Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (!(obj instanceof FieldContext))
+				return false;
+			final FieldContext other = (FieldContext) obj;
+			return name.equals(other.name);
 		}
 		
 	}
@@ -121,17 +142,11 @@ public final class Fields implements Iterable<FieldContext> {
 	 * Creates a fields object and initialises it with all non-transient and non-static fields of the given class and its superclasses.
 	 * 
 	 * @param c Some class
+	 * @throws NotSerializableException If a field occurs more than once (i.e. if a class has a field with the same name as a field in one of its superclasses)
 	 */
-	public Fields(final Class<?> c) {
-		for (Class<?> sc = c; sc != null; sc = sc.getSuperclass()) {
-			final Field[] fs = sc.getDeclaredFields();
-			for (final Field f : fs) {
-				final int m = f.getModifiers();
-				if (Modifier.isStatic(m) || Modifier.isTransient(m))
-					continue;
-				f.setAccessible(true);
-				fields.put(f.getName(), new FieldContext(f.getName()));
-			}
+	public Fields(final Class<?> c) throws NotSerializableException {
+		for (final Field f : getFields(c)) {
+			fields.put(f.getName(), new FieldContext(f.getName()));
 		}
 	}
 	
@@ -139,24 +154,49 @@ public final class Fields implements Iterable<FieldContext> {
 	 * Creates a fields object and initialises it with all non-transient and non-static fields of the given object.
 	 * 
 	 * @param o Some object
+	 * @throws NotSerializableException If a field occurs more than once (i.e. if a class has a field with the same name as a field in one of its superclasses)
 	 */
-	public Fields(final Object o) {
-		for (Class<?> sc = o.getClass(); sc != null; sc = sc.getSuperclass()) {
+	public Fields(final Object o) throws NotSerializableException {
+		for (final Field f : getFields(o.getClass())) {
+			try {
+				fields.put(f.getName(), new FieldContext(f, o));
+			} catch (final IllegalArgumentException e) {
+				assert false;
+			} catch (final IllegalAccessException e) {
+				assert false;
+			}
+		}
+	}
+	
+	private final static Map<Class<?>, Collection<Field>> cache = new HashMap<Class<?>, Collection<Field>>();
+	
+	/**
+	 * Gets all serialisable fields of the provided class.
+	 * 
+	 * @param c The class to get the fields of
+	 * @return All non-static and non-transient fields of the given class and its superclasses
+	 * @throws NotSerializableException If a field occurs more than once (i.e. if a class has a field with the same name as a field in one of its superclasses)
+	 */
+	public final static Collection<Field> getFields(final Class<?> c) throws NotSerializableException {
+		Collection<Field> fields = cache.get(c);
+		if (fields != null)
+			return fields;
+		fields = new ArrayList<Field>();
+		for (Class<?> sc = c; sc != null; sc = sc.getSuperclass()) {
 			final Field[] fs = sc.getDeclaredFields();
 			for (final Field f : fs) {
 				final int m = f.getModifiers();
 				if (Modifier.isStatic(m) || Modifier.isTransient(m))
 					continue;
+				if (fields.contains(f))
+					throw new NotSerializableException(c.getName() + ": duplicate field " + f.getName());
 				f.setAccessible(true);
-				try {
-					fields.put(f.getName(), new FieldContext(f, o));
-				} catch (final IllegalArgumentException e) {
-					assert false;
-				} catch (final IllegalAccessException e) {
-					assert false;
-				}
+				fields.add(f);
 			}
 		}
+		fields = Collections.unmodifiableCollection(fields);
+		cache.put(c, fields);
+		return fields;
 	}
 	
 	/**
@@ -169,10 +209,21 @@ public final class Fields implements Iterable<FieldContext> {
 	 *            {@link YggdrasilRobustSerializable} and handles <i>all</i> fields, or if you are sure that <tt>fields</tt> only contains existing fields. A
 	 *            {@link NullPointerException} may be thrown otherwise.
 	 * @throws StreamCorruptedException
+	 * @throws NotSerializableException
 	 */
-	public void setFields(final Object o, final Yggdrasil y) throws StreamCorruptedException {
-		for (final FieldContext c : this)
-			c.setField(o, y);
+	public void setFields(final Object o, final Yggdrasil y) throws StreamCorruptedException, NotSerializableException {
+		final Set<FieldContext> missing = new HashSet<FieldContext>(fields.values());
+		for (final Field f : getFields(o.getClass())) {
+			final FieldContext c = fields.get(f.getName());
+			if (c == null)
+				throw new StreamCorruptedException("Missing field " + f.getName() + " of " + o.getClass() + " in stream");
+			c.setField(o, f, y);
+			missing.remove(c);
+		}
+		for (final FieldContext f : missing) {
+			if (!(o instanceof YggdrasilRobustSerializable) || !((YggdrasilRobustSerializable) o).missingField(f))
+				y.missingField(o, f);
+		}
 	}
 	
 	/**
@@ -242,8 +293,8 @@ public final class Fields implements Iterable<FieldContext> {
 		return (T) o;
 	}
 	
-	public <T> T getAndRemoveObject(String field, Class<T> expectedType) throws StreamCorruptedException {
-		T t = getObject(field, expectedType);
+	public <T> T getAndRemoveObject(final String field, final Class<T> expectedType) throws StreamCorruptedException {
+		final T t = getObject(field, expectedType);
 		removeField(field);
 		return t;
 	}

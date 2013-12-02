@@ -26,6 +26,7 @@ import static ch.njol.yggdrasil.Tag.*;
 import java.io.Closeable;
 import java.io.Flushable;
 import java.io.IOException;
+import java.io.NotSerializableException;
 import java.lang.reflect.Array;
 import java.util.IdentityHashMap;
 
@@ -113,7 +114,7 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 	private final void writeGenericObject(final Object o, int ref) throws IOException {
 		final Class<?> c = o.getClass();
 		if (!y.isSerializable(c))
-			throw new YggdrasilException(c + " is not serialisable");
+			throw new NotSerializableException(c.getName());
 		final Fields fields;
 		final YggdrasilSerializer s = y.getSerializer(c);
 		if (s != null) {
@@ -133,7 +134,7 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 		}
 		if (fields.size() > Short.MAX_VALUE)
 			throw new YggdrasilException("Class " + c.getCanonicalName() + " has too many fields (" + fields.size() + ")");
-		writeObjectStart(y.getID(o.getClass()));
+		writeObjectStart(y.getID(c));
 		writeNumFields((short) fields.size());
 		for (final FieldContext f : fields) {
 			writeFieldName(f.name);
@@ -164,7 +165,8 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 			writeReference(ref);
 			return;
 		}
-		final int ref = nextObjectID++;
+		final int ref = nextObjectID;
+		nextObjectID++;
 		writtenObjects.put(o, ref);
 		final Tag type = getType(o.getClass());
 		if (type.isWrapper()) {

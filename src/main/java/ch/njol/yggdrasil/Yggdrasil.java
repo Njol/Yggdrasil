@@ -87,8 +87,10 @@ public final class Yggdrasil {
 	public final boolean isSerializable(final Class<?> c) {
 		try {
 			return c.isPrimitive() || c == Object.class || Enum.class.isAssignableFrom(c) && getIDNoError(c) != null ||
-					((YggdrasilSerializable.class.isAssignableFrom(c) || getSerializer(c) != null) && newInstance(c) != null);
+					((YggdrasilSerializable.class.isAssignableFrom(c) || getSerializer(c) != null) && newInstance(c) != c);// whatever, just make true out if it (null is a valid return value)
 		} catch (final StreamCorruptedException e) { // thrown by newInstance if the class does not provide a correct constructor or is abstract
+			return false;
+		} catch (final NotSerializableException e) {
 			return false;
 		}
 	}
@@ -107,7 +109,7 @@ public final class Yggdrasil {
 		for (final ClassResolver r : classResolvers) {
 			final Class<?> c = r.getClass(id);
 			if (c != null) { // TODO error if not serialisable?
-				assert id.equals(r.getID(c));
+				assert id.equals(r.getID(c)) : r + " returned " + c + " for id " + id + ", but returns id " + r.getID(c) + " for that class";
 				return c;
 			}
 		}
@@ -123,7 +125,8 @@ public final class Yggdrasil {
 		for (final ClassResolver r : classResolvers) {
 			final String id = r.getID(c);
 			if (id != null) {
-				assert r.getClass(id) == c;
+				// serialisers may handle subclasses while the default serialisation only handles exact classes
+				assert r instanceof YggdrasilSerializer ? r.getClass(id).isAssignableFrom(c) && id.equals(r.getID(r.getClass(id))) : r.getClass(id) == c : r + " returned id " + id + " for " + c + ", but returns " + r.getClass(id) + " for that id";
 				return id;
 			}
 		}
@@ -184,11 +187,21 @@ public final class Yggdrasil {
 		}
 	}
 	
-	final Object newInstance(final Class<?> c) throws StreamCorruptedException {
-		final YggdrasilSerializer<?> s = getSerializer(c);
+	@SuppressWarnings({"rawtypes", "unchecked"})
+	final Object newInstance(final Class<?> c) throws StreamCorruptedException, NotSerializableException {
+		final YggdrasilSerializer s = getSerializer(c);
 		if (s != null) {
-			@SuppressWarnings({"unchecked", "rawtypes"})
-			final Object o = s.newInstance((Class) c);
+			if (!s.canBeInstantiated(c)) { // only used by isSerializable - return null if OK, throw an YggdrasilException if not
+				try {
+					final Object o = s.deserialize(c, new Fields());
+					if (o != null)
+						return null;
+					throw new YggdrasilException("YggdrasilSerializer " + s + " returned null from deserialize(" + c + ",new Fields())");
+				} catch (final StreamCorruptedException e) {
+					return null;
+				}
+			}
+			final Object o = s.newInstance(c);
 			if (o == null)
 				throw new YggdrasilException("YggdrasilSerializer " + s + " returned null from newInstance(" + c + ")");
 			return o;

@@ -21,7 +21,7 @@
 
 package ch.njol.yggdrasil;
 
-import java.io.IOException;
+import java.io.NotSerializableException;
 import java.io.StreamCorruptedException;
 import java.lang.reflect.Field;
 
@@ -92,8 +92,9 @@ public interface YggdrasilSerializable {
 		 * You can use <tt>return new {@link Fields#Fields(Object) Fields}(this);</tt> to emulate the default behaviour.
 		 * 
 		 * @return A Fields object containing all fields that should be written to stream
+		 * @throws NotSerializableException If this object or one of its fields is not serialisable
 		 */
-		public Fields serialize();
+		public Fields serialize() throws NotSerializableException;
 		
 		/**
 		 * Deserialises this object. No fields have been set when this method is called, use <tt>fields.{@link Fields#setFields setFields}(this, yggdrasil)</tt> to set all
@@ -102,8 +103,10 @@ public interface YggdrasilSerializable {
 		 * You can use <tt>fields.{@link Fields#setFields(Object, Yggdrasil) setFields}(this, yggdrasil);</tt> to emulate the default behaviour.
 		 * 
 		 * @param fields A Fields object containing all fields read from stream
+		 * @throws StreamCorruptedException If the Fields object contains invalid or missing fields (superfluous fields may be ignored)
+		 * @throws NotSerializableException
 		 */
-		public void deserialize(Fields fields) throws StreamCorruptedException;
+		public void deserialize(Fields fields) throws StreamCorruptedException, NotSerializableException;
 		
 	}
 	

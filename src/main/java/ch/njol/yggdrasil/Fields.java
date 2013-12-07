@@ -299,6 +299,12 @@ public final class Fields implements Iterable<FieldContext> {
 		return t;
 	}
 	
+	public <T> T getAndRemovePrimitive(final String field, final Class<T> expectedType) throws StreamCorruptedException {
+		final T t = getPrimitive(field, expectedType);
+		removeField(field);
+		return t;
+	}
+	
 	/**
 	 * Removes a field and its value from this Fields object.
 	 * 

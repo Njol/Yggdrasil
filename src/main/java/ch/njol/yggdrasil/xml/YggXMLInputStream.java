@@ -209,8 +209,8 @@ public final class YggXMLInputStream extends YggdrasilInputStream {
 	// Array
 	
 	@Override
-	protected Class<?> readArrayContentType() throws IOException {
-		return getType(getAttribute("contentType"));
+	protected Class<?> readArrayComponentType() throws IOException {
+		return getType(getAttribute("componentType"));
 	}
 	
 	@Override
@@ -289,6 +289,7 @@ public final class YggXMLInputStream extends YggdrasilInputStream {
 	@Override
 	public void close() throws IOException {
 		try {
+			// TODO error if not at EOF?
 			in.close();
 			is.close();
 		} catch (final XMLStreamException e) {

@@ -21,6 +21,9 @@
 
 package ch.njol.yggdrasil;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.NotSerializableException;
@@ -109,6 +112,7 @@ public final class Yggdrasil {
 		for (final ClassResolver r : classResolvers) {
 			final Class<?> c = r.getClass(id);
 			if (c != null) { // TODO error if not serialisable?
+				assert Tag.byName(id) == null && (Tag.getType(c) == Tag.T_OBJECT || Tag.getType(c) == Tag.T_ENUM) : "Tag IDs should not be matched: " + id + " (class resolver: " + r + ")";
 				assert id.equals(r.getID(c)) : r + " returned " + c + " for id " + id + ", but returns id " + r.getID(c) + " for that class";
 				return c;
 			}
@@ -125,8 +129,9 @@ public final class Yggdrasil {
 		for (final ClassResolver r : classResolvers) {
 			final String id = r.getID(c);
 			if (id != null) {
+				assert Tag.byName(id) == null : "Class IDs should not match Tag IDs: " + id + " (class resolver: " + r + ")";
 				// serialisers may handle subclasses while the default serialisation only handles exact classes
-				assert r instanceof YggdrasilSerializer ? r.getClass(id).isAssignableFrom(c) && id.equals(r.getID(r.getClass(id))) : r.getClass(id) == c : r + " returned id " + id + " for " + c + ", but returns " + r.getClass(id) + " for that id";
+				assert (r instanceof YggdrasilSerializer ? r.getClass(id).isAssignableFrom(c) && id.equals(r.getID(r.getClass(id))) : r.getClass(id) == c) : r + " returned id " + id + " for " + c + ", but returns " + r.getClass(id) + " for that id";
 				return id;
 			}
 		}
@@ -171,6 +176,37 @@ public final class Yggdrasil {
 			} catch (final NoSuchFieldException e) {}
 		}
 		return null;
+	}
+	
+	public void saveToFile(final Object o, final File f) throws IOException {
+		FileOutputStream fout = null;
+		YggdrasilOutputStream yout = null;
+		try {
+			fout = new FileOutputStream(f);
+			yout = newOutputStream(fout);
+			yout.writeObject(o);
+			yout.flush();
+		} finally {
+			if (yout != null)
+				yout.close();
+			if (fout != null)
+				fout.close();
+		}
+	}
+	
+	public <T> T loadFromFile(final File f, final Class<T> expectedType) throws IOException {
+		FileInputStream fin = null;
+		YggdrasilInputStream yin = null;
+		try {
+			fin = new FileInputStream(f);
+			yin = newInputStream(fin);
+			return yin.readObject(expectedType);
+		} finally {
+			if (yin != null)
+				yin.close();
+			if (fin != null)
+				fin.close();
+		}
 	}
 	
 	private static Method getSerializableConstructor;

@@ -41,25 +41,48 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 		this.y = y;
 	}
 	
+	// Tag
+	
+	protected abstract void writeTag(Tag t) throws IOException;
+	
 	// Null
 	
-	protected abstract void writeNull() throws IOException;
+	private final void writeNull() throws IOException {
+		writeTag(T_NULL);
+	}
 	
 	// Primitives
 	
-	protected abstract void writePrimitive(Object o) throws IOException;
+	protected abstract void writePrimitiveValue(Object o) throws IOException;
 	
 	protected abstract void writePrimitive_(Object o) throws IOException;
 	
-	protected abstract void writeWrappedPrimitive(Object o) throws IOException;
+	private final void writePrimitive(final Object o) throws IOException {
+		final Tag t = Tag.getType(o.getClass());
+		assert t.isWrapper();
+		writeTag(t.getPrimitive());
+		writePrimitiveValue(o);
+	}
+	
+	private final void writeWrappedPrimitive(final Object o) throws IOException {
+		final Tag t = Tag.getType(o.getClass());
+		assert t.isWrapper();
+		writeTag(t);
+		writePrimitiveValue(o);
+	}
 	
 	// String
 	
-	protected abstract void writeString(String s) throws IOException;
+	protected abstract void writeStringValue(String s) throws IOException;
+	
+	private final void writeString(final String s) throws IOException {
+		writeTag(T_STRING);
+		writeStringValue(s);
+	}
 	
 	// Array
 	
-	protected abstract void writeArrayStart(Class<?> componentType) throws IOException;
+	protected abstract void writeArrayComponentType(Class<?> componentType) throws IOException;
 	
 	protected abstract void writeArrayLength(int length) throws IOException;
 	
@@ -68,7 +91,8 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 	private final void writeArray(final Object array) throws IOException {
 		final int length = Array.getLength(array);
 		final Class<?> ct = array.getClass().getComponentType();
-		writeArrayStart(ct);
+		writeTag(T_ARRAY);
+		writeArrayComponentType(ct);
 		writeArrayLength(length);
 		if (ct.isPrimitive()) {
 			for (int i = 0; i < length; i++)
@@ -83,26 +107,38 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 	
 	// Enum
 	
-	protected abstract void writeEnumStart(String type) throws IOException;
+	protected abstract void writeEnumType(String type) throws IOException;
 	
 	protected abstract void writeEnumName(String name) throws IOException;
 	
 	private final void writeEnum(final Enum<?> o) throws IOException {
-		writeEnumStart(y.getID(o.getDeclaringClass()));
+		writeTag(T_ENUM);
+		writeEnumType(y.getID(o.getDeclaringClass()));
 		writeEnumName(o.name());
 	}
 	
 	// Class
 	
-	protected abstract void writeClass(Class<?> c) throws IOException;
+	protected abstract void writeClassType(Class<?> c) throws IOException;
+	
+	private final void writeClass(final Class<?> c) throws IOException {
+		writeTag(T_CLASS);
+		writeClassType(c);
+	}
 	
 	// Reference
 	
-	protected abstract void writeReference(int ref) throws IOException;
+	protected abstract void writeReferenceID(int ref) throws IOException;
+	
+	protected final void writeReference(final int ref) throws IOException {
+		assert ref >= 0;
+		writeTag(T_REFERENCE);
+		writeReferenceID(ref);
+	}
 	
 	// generic Objects
 	
-	protected abstract void writeObjectStart(String type) throws IOException;
+	protected abstract void writeObjectType(String type) throws IOException;
 	
 	protected abstract void writeNumFields(short numFields) throws IOException;
 	
@@ -134,7 +170,9 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 		}
 		if (fields.size() > Short.MAX_VALUE)
 			throw new YggdrasilException("Class " + c.getCanonicalName() + " has too many fields (" + fields.size() + ")");
-		writeObjectStart(y.getID(c));
+		
+		writeTag(T_OBJECT);
+		writeObjectType(y.getID(c));
 		writeNumFields((short) fields.size());
 		for (final FieldContext f : fields) {
 			writeFieldName(f.name);
@@ -144,6 +182,7 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 				writeObject(f.getObject());
 		}
 		writeObjectEnd();
+		
 		if (ref < 0)
 			writtenObjects.put(o, ~ref);
 	}

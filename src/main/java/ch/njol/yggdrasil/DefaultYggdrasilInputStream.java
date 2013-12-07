@@ -117,11 +117,15 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 	}
 	
 	private short readShort() throws IOException {
-		return (short) readUnsignedShort();
+		return (short) (read() << 8 | read());
 	}
 	
-	private int readUnsignedShort() throws IOException {
-		return read() << 8 | read();
+	private short readUnsignedShort() throws IOException {
+		final int b = read();
+		if ((b & 0x80) != 0)
+			return (short) (b & ~0x80);
+		else
+			return (short) (b << 8 | read());
 	}
 	
 	private int readInt() throws IOException {
@@ -129,6 +133,14 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 				| read() << 16
 				| read() << 8
 				| read();
+	}
+	
+	private int readUnsignedInt() throws IOException {
+		final int b = read();
+		if ((b & 0x80) != 0)
+			return (b & ~0x80) << 8 | read();
+		else
+			return b << 24 | read() << 16 | read() << 8 | read();
 	}
 	
 	private long readLong() throws IOException {
@@ -184,8 +196,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 				return readBoolean();
 				//$CASES-OMITTED$
 			default:
-				assert false;
-				return null;
+				throw new YggdrasilException("Internal error");
 		}
 	}
 	
@@ -198,7 +209,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 	
 	@Override
 	protected String readString() throws IOException {
-		final int length = readInt();
+		final int length = readUnsignedInt();
 		final byte[] d = new byte[length];
 		readFully(d);
 		return new String(d, utf8);
@@ -207,14 +218,13 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 	// Array
 	
 	@Override
-	protected Class<?> readArrayContentType() throws IOException {
-		final Class<?> c = readClass();
-		return c;
+	protected Class<?> readArrayComponentType() throws IOException {
+		return readClass();
 	}
 	
 	@Override
 	protected int readArrayLength() throws IOException {
-		return readInt();
+		return readUnsignedInt();
 	}
 	
 	// Enum
@@ -265,9 +275,10 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 				break;
 			case T_NULL:
 			case T_REFERENCE:
+				throw new StreamCorruptedException("unexpected tag " + type);
 			case T_ARRAY:
 			default:
-				throw new StreamCorruptedException("unexpected tag " + type);
+				throw new YggdrasilException("Internal error");
 		}
 		while (dim-- > 0)
 			c = Array.newInstance(c, 0).getClass();
@@ -278,7 +289,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 	
 	@Override
 	protected int readReference() throws IOException {
-		return readInt();
+		return readUnsignedInt();
 	}
 	
 	// generic Object
@@ -290,7 +301,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 	
 	@Override
 	protected short readNumFields() throws IOException {
-		return readShort();
+		return readUnsignedShort();
 	}
 	
 	@Override
@@ -302,7 +313,12 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 	
 	@Override
 	public void close() throws IOException {
-		in.close();
+		try {
+			read();
+			throw new StreamCorruptedException("Stream still has data, at least " + (1 + in.available()) + " bytes remain");
+		} catch (final EOFException e) {} finally {
+			in.close();
+		}
 	}
 	
 }

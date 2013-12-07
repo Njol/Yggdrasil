@@ -18,7 +18,7 @@ T_INT
 
 T_OBJECT
 'SomeClass'
-0x00000005
+0x00000006
 	
 	'enabled' # consists of <1 byte UTF-8 length> + <chars as UTF-8 bytes> OR <T_REFERENCE> + <int ref>
 	T_BOOLEAN
@@ -29,7 +29,8 @@ T_OBJECT
 	0x00000141E08202B7
 	
 	'listeners'
-	T_COLLECTION
+	T_OBJECT
+	'ArrayList'
 	0x00000000
 	
 	'mat'
@@ -42,35 +43,7 @@ T_OBJECT
 	
 	'list'
 	T_REFERENCE
-	0x00000000 # first T_COLLECTION
+	0x00000000 # first T_ARRAY
 
 T_STRING
-"<an example string>"
-
-T_COLLECTION
-'ArrayList'
-0x00000003
-	
-	T_INT_OBJ
-	0x0000012C
-	
-	T_DOUBLE_OBJ
-	<20.7>
-	
-	T_REFERENCE
-	0x00000006 # first int in this list
-
-T_MAP
-'HashMap'
-0x0000002
-	
-	T_INT_OBJ
-	0x0000005
-		T_STRING
-		"blah"
-	
-	T_REFERENCE
-	0x00000003
-		T_STRING
-		"blah2"
-
+"<an example string>" # <4 byte UTF-8 length> + <chars as UTF-8 bytes>

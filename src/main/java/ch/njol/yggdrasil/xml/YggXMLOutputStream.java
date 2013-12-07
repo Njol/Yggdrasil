@@ -102,15 +102,6 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 		return s + a;
 	}
 	
-	private void writeStartElement(final String s) throws IOException {
-		try {
-			out.writeStartElement(s);
-			writeName();
-		} catch (final XMLStreamException e) {
-			throw new IOException(e);
-		}
-	}
-	
 	private void writeEndElement() throws IOException {
 		try {
 			out.writeEndElement();
@@ -135,12 +126,16 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 		}
 	}
 	
-	// Null
+	// Tag
 	
 	@Override
-	public void writeNull() throws IOException {
+	protected void writeTag(final Tag t) throws IOException {
 		try {
-			out.writeEmptyElement("null");
+			if (t == T_NULL)
+				out.writeEmptyElement(t.name);
+			else
+				out.writeStartElement(t.name);
+			writeName();
 		} catch (final XMLStreamException e) {
 			throw new IOException(e);
 		}
@@ -149,9 +144,7 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 	// Primitives
 	
 	@Override
-	protected void writePrimitive(final Object o) throws IOException {
-		final Tag type = getPrimitiveFromWrapper(o.getClass());
-		writeStartElement(type.name);
+	protected void writePrimitiveValue(final Object o) throws IOException {
 		writeCharacters("" + o);
 		writeEndElement();
 	}
@@ -202,19 +195,10 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 		writeCharacters(StringUtils.multiply('0', Math.max(0, 2 * size - s.length())) + s);
 	}
 	
-	@Override
-	protected void writeWrappedPrimitive(final Object o) throws IOException {
-		final Tag type = getType(o.getClass());
-		writeStartElement(type.name);
-		writeCharacters("" + o);
-		writeEndElement();
-	}
-	
 	// String
 	
 	@Override
-	protected void writeString(final String s) throws IOException {
-		writeStartElement("string");
+	protected void writeStringValue(final String s) throws IOException {
 		writeCharacters(s);
 		writeEndElement();
 	}
@@ -222,9 +206,8 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 	// Array
 	
 	@Override
-	protected void writeArrayStart(final Class<?> contentType) throws IOException {
-		writeStartElement("array");
-		writeAttribute("contentType", getTypeName(contentType));
+	protected void writeArrayComponentType(final Class<?> contentType) throws IOException {
+		writeAttribute("componentType", getTypeName(contentType));
 	}
 	
 	@Override
@@ -240,8 +223,7 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 	// Enum
 	
 	@Override
-	protected void writeEnumStart(final String type) throws IOException {
-		writeStartElement("enum");
+	protected void writeEnumType(final String type) throws IOException {
 		writeAttribute("type", type);
 	}
 	
@@ -254,8 +236,7 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 	// Class
 	
 	@Override
-	protected void writeClass(final Class<?> c) throws IOException {
-		writeStartElement("class");
+	protected void writeClassType(final Class<?> c) throws IOException {
 		writeCharacters(getTypeName(c));
 		writeEndElement();
 	}
@@ -263,8 +244,7 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 	// Reference
 	
 	@Override
-	protected void writeReference(final int ref) throws IOException {
-		writeStartElement("reference");
+	protected void writeReferenceID(final int ref) throws IOException {
 		writeCharacters("" + ref);
 		writeEndElement();
 	}
@@ -272,8 +252,7 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 	// generic Object
 	
 	@Override
-	protected void writeObjectStart(final String type) throws IOException {
-		writeStartElement("object");
+	protected void writeObjectType(final String type) throws IOException {
 		writeAttribute("type", type);
 	}
 	
@@ -302,7 +281,7 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 		writeEndElement();
 	}
 	
-	// strem
+	// stream
 	
 	@Override
 	public void flush() throws IOException {

@@ -57,7 +57,7 @@ public abstract class YggdrasilInputStream implements Closeable {
 	
 	// Array
 	
-	protected abstract Class<?> readArrayContentType() throws IOException;
+	protected abstract Class<?> readArrayComponentType() throws IOException;
 	
 	protected abstract int readArrayLength() throws IOException;
 	
@@ -165,7 +165,7 @@ public abstract class YggdrasilInputStream implements Closeable {
 		final Object o;
 		switch (t) {
 			case T_ARRAY: {
-				final Class<?> c = readArrayContentType();
+				final Class<?> c = readArrayComponentType();
 				o = Array.newInstance(c, readArrayLength());
 				readObjects.add(o);
 				readArrayContents(o);

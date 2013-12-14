@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.StreamCorruptedException;
 import java.lang.reflect.Array;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -92,7 +93,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 		} else {
 			final byte[] d = new byte[length];
 			readFully(d);
-			final String s = new String(d, utf8);
+			final String s = new String(d, StandardCharsets.UTF_8);
 			if (length > 4)
 				readShortStrings.add(s);
 			return s;
@@ -212,7 +213,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 		final int length = readUnsignedInt();
 		final byte[] d = new byte[length];
 		readFully(d);
-		return new String(d, utf8);
+		return new String(d, StandardCharsets.UTF_8);
 	}
 	
 	// Array

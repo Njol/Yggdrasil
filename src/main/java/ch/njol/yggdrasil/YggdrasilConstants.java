@@ -22,7 +22,6 @@
 package ch.njol.yggdrasil;
 
 import java.io.Externalizable;
-import java.nio.charset.Charset;
 
 public abstract class YggdrasilConstants {
 	private YggdrasilConstants() {}
@@ -59,9 +58,5 @@ public abstract class YggdrasilConstants {
 			this.tag = tag;
 		}
 	}
-	
-	// === UTF-8 ===
-	
-	public final static Charset utf8 = Charset.forName("UTF-8");
 	
 }

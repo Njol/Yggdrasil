@@ -201,8 +201,6 @@ public final class Fields implements Iterable<FieldContext> {
 	
 	/**
 	 * Sets all fields of the given Object to the values stored in this Fields object.
-	 * <p>
-	 * This also sets transient fields.
 	 * 
 	 * @param o The object whose fields should be set
 	 * @param y A reference to the Yggdrasil object used for loading - this is required for incompatible or missing fields. You can use <tt>null</tt> if your class implements

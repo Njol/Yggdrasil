@@ -26,6 +26,7 @@ import static ch.njol.yggdrasil.YggdrasilConstants.*;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 
 public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
@@ -61,7 +62,7 @@ public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
 			writeTag(T_REFERENCE);
 			writeInt(writtenShortStrings.get(s));
 		} else {
-			final byte[] d = s.getBytes(utf8);
+			final byte[] d = s.getBytes(StandardCharsets.UTF_8);
 			if (d.length >= (T_REFERENCE.tag & 0xFF))
 				throw new YggdrasilException("Field name or Class ID too long: " + s);
 			write(d.length);
@@ -174,7 +175,7 @@ public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
 	
 	@Override
 	protected void writeStringValue(final String s) throws IOException {
-		final byte[] d = s.getBytes(utf8);
+		final byte[] d = s.getBytes(StandardCharsets.UTF_8);
 		writeUnsignedInt(d.length);
 		out.write(d);
 	}

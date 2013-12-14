@@ -130,8 +130,7 @@ public final class Yggdrasil {
 			final String id = r.getID(c);
 			if (id != null) {
 				assert Tag.byName(id) == null : "Class IDs should not match Tag IDs: " + id + " (class resolver: " + r + ")";
-				// serialisers may handle subclasses while the default serialisation only handles exact classes
-				assert (r instanceof YggdrasilSerializer ? r.getClass(id).isAssignableFrom(c) && id.equals(r.getID(r.getClass(id))) : r.getClass(id) == c) : r + " returned id " + id + " for " + c + ", but returns " + r.getClass(id) + " for that id";
+				assert (r instanceof YggdrasilSerializer ? id.equals(r.getID(r.getClass(id))) : r.getClass(id) == c) : r + " returned id " + id + " for " + c + ", but returns " + r.getClass(id) + " for that id";
 				return id;
 			}
 		}
@@ -232,7 +231,7 @@ public final class Yggdrasil {
 					final Object o = s.deserialize(c, new Fields());
 					if (o != null)
 						return null;
-					throw new YggdrasilException("YggdrasilSerializer " + s + " returned null from deserialize(" + c + ",new Fields())");
+					throw new YggdrasilException("YggdrasilSerializer " + s + " returned null from deserialize(" + c + ", new Fields())");
 				} catch (final StreamCorruptedException e) {
 					return null;
 				}

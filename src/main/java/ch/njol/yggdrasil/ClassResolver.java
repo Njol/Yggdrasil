@@ -1,5 +1,5 @@
 /*
- *   This file is part of Yggdrasil, a data format to store object graphs.
+ *   This file is part of Yggdrasil, a data format to store object graphs, and the Java implementation thereof.
  *
  *  Yggdrasil is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -21,6 +21,8 @@
 
 package ch.njol.yggdrasil;
 
+import org.eclipse.jdt.annotation.Nullable;
+
 public interface ClassResolver {
 	
 	/**
@@ -29,6 +31,7 @@ public interface ClassResolver {
 	 * @param id The ID used when storing objects
 	 * @return The Class object that represents data with the given ID, or null if the ID does not belong to the implementor
 	 */
+	@Nullable
 	public Class<?> getClass(String id);
 	
 	/**
@@ -39,6 +42,7 @@ public interface ClassResolver {
 	 * @param c The class to get the ID of
 	 * @return The ID of the given class, or null if this is not a class of the implementor
 	 */
+	@Nullable
 	public String getID(Class<?> c);
 	
 }

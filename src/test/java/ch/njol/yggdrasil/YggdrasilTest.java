@@ -1,5 +1,7 @@
 package ch.njol.yggdrasil;
 
+import static org.junit.Assert.*;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -16,41 +18,69 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.eclipse.jdt.annotation.Nullable;
 import org.junit.Test;
 
 import ch.njol.yggdrasil.YggdrasilSerializable.YggdrasilExtendedSerializable;
-import ch.njol.yggdrasil.xml.YggXMLOutputStream;
 
 @SuppressWarnings("resource")
 public class YggdrasilTest {
 	
-	private static Yggdrasil y = new Yggdrasil();
+	static Yggdrasil y = new Yggdrasil();
 	static {
-		y.registerClassResolver(new ClassResolver() {
-			@Override
-			public String getID(final Class<?> c) {
-				return c.getSimpleName();
-			}
-			
-			@Override
-			public Class<?> getClass(final String id) {
-				try {
-					return Class.forName(YggdrasilTest.class.getCanonicalName() + "$" + id);
-				} catch (final ClassNotFoundException e) {
-					return null;
-				}
-			}
-		});
+		y.registerSingleClass(TestEnum.class);
+		y.registerSingleClass(PETest1.class);
+		y.registerSingleClass(PETest1.PETest2.class);
+		y.registerSingleClass(TestClass1.class);
+		y.registerSingleClass(TestClass2.class);
 	}
 	
+	@YggdrasilID("test-enum #!~/\r\n\t\\\"'<>&amp;,.:'`´¢⽰杻鱶")
 	private static enum TestEnum implements YggdrasilSerializable {
 		SOMETHING, SOMETHINGELSE;
 	}
 	
+	@YggdrasilID("PETest1")
+	private static class PETest1 extends PseudoEnum<PETest1> {
+		protected PETest1(final String name) {
+			super(name);
+		}
+		
+		public final static PETest1 PET1_0 = new PETest1("PET1_0 #!~/\r\n\t\\\"'<>&amp;,.:'`´¢⽰杻鱶");
+		
+		@YggdrasilID("PETest2")
+		public static class PETest2 extends PETest1 {
+			protected PETest2(final String name) {
+				super(name);
+			}
+			
+			public final static PETest2 PET2_0 = new PETest2("PET2_0");
+			
+			public final static PETest2 PET2_1 = new PETest2("PET2_1") {
+				@Override
+				public String toString() {
+					return "PET2_1!!!";
+				}
+			};
+			
+			public final static PETest1 PET1_1 = new PETest1("PET1_1");
+			
+		}
+		
+		public final static PETest2 PET2_2 = new PETest2("PET2_2");
+		
+		public final static PETest1 PET1_2 = new PETest1("PET1_2") {};
+		
+	}
+	
+	public final static PETest1 PET1_3 = new PETest1("PET1_3");
+	
+	@YggdrasilID("TestClass1")
 	private final static class TestClass1 implements YggdrasilSerializable {
+		@Nullable
 		private final String blah;
 		
-		TestClass1() {
+		private TestClass1() {
 			blah = "blah";
 		}
 		
@@ -62,12 +92,13 @@ public class YggdrasilTest {
 		public int hashCode() {
 			final int prime = 31;
 			int result = 1;
+			final String blah = this.blah;
 			result = prime * result + ((blah == null) ? 0 : blah.hashCode());
 			return result;
 		}
 		
 		@Override
-		public boolean equals(final Object obj) {
+		public boolean equals(final @Nullable Object obj) {
 			if (this == obj)
 				return true;
 			if (obj == null)
@@ -75,6 +106,7 @@ public class YggdrasilTest {
 			if (!(obj instanceof TestClass1))
 				return false;
 			final TestClass1 other = (TestClass1) obj;
+			final String blah = this.blah;
 			if (blah == null) {
 				if (other.blah != null)
 					return false;
@@ -85,10 +117,11 @@ public class YggdrasilTest {
 		
 		@Override
 		public String toString() {
-			return blah;
+			return "" + blah;
 		}
 	}
 	
+	@YggdrasilID("TestClass2")
 	private final static class TestClass2 implements YggdrasilExtendedSerializable {
 		private transient boolean ok = false;
 		private final static int DEFAULT = 5;
@@ -129,7 +162,7 @@ public class YggdrasilTest {
 		}
 		
 		@Override
-		public boolean equals(final Object obj) {
+		public boolean equals(final @Nullable Object obj) {
 			if (this == obj)
 				return true;
 			if (obj == null)
@@ -150,7 +183,8 @@ public class YggdrasilTest {
 		}
 	}
 	
-	private static byte[] save(final Object o) throws IOException {
+	@SuppressWarnings("null")
+	private static byte[] save(final @Nullable Object o) throws IOException {
 		final ByteArrayOutputStream out = new ByteArrayOutputStream();
 		final YggdrasilOutputStream s = y.newOutputStream(out);
 		s.writeObject(o);
@@ -159,28 +193,32 @@ public class YggdrasilTest {
 		return out.toByteArray();
 	}
 	
-	private static String saveXML(final Object o) throws IOException {
-		final ByteArrayOutputStream out = new ByteArrayOutputStream();
-		final YggXMLOutputStream s = y.newXMLOutputStream(out);
-		s.writeObject(o);
-		s.flush();
-		s.close();
-		return out.toString("utf-8");
-	}
+//	@SuppressWarnings("null")
+//	private static String saveXML(final @Nullable Object o) throws IOException {
+//		final ByteArrayOutputStream out = new ByteArrayOutputStream();
+//		final YggXMLOutputStream s = y.newXMLOutputStream(out);
+//		s.writeObject(o);
+//		s.flush();
+//		s.close();
+//		return out.toString("utf-8");
+//	}
 	
+	@Nullable
 	private static Object load(final byte[] d) throws IOException {
 		final YggdrasilInputStream l = y.newInputStream(new ByteArrayInputStream(d));
 		return l.readObject();
 	}
 	
-	private static Object loadXML(final String xml) throws IOException {
-		final YggdrasilInputStream l = y.newXMLInputStream(new ByteArrayInputStream(xml.getBytes("utf-8")));
-		return l.readObject();
-	}
+//	@Nullable
+//	private static Object loadXML(final String xml) throws IOException {
+//		final YggdrasilInputStream l = y.newXMLInputStream(new ByteArrayInputStream(xml.getBytes("utf-8")));
+//		return l.readObject();
+//	}
 	
 	// random objects
+	/* private constructor is tested -> */@SuppressWarnings("synthetic-access")
 	final Object[] random = {
-			1, .5, true, 'a', "abc", 2l, (byte) -1, (short) 124, Float.POSITIVE_INFINITY,
+			1, .5, true, 'a', "abc", "multi\nline\r\nstring\rwith\t\n\r\ttabs \u2001\nand\n\u00A0other\u2000\nwhitespace", 2l, (byte) -1, (short) 124, Float.POSITIVE_INFINITY,
 			Byte.MIN_VALUE, Byte.MAX_VALUE, Short.MIN_VALUE, Short.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE,
 			Float.MIN_NORMAL, Float.MIN_VALUE, Float.NEGATIVE_INFINITY, -Float.MAX_VALUE, Double.MIN_NORMAL, Double.MIN_VALUE, Double.NEGATIVE_INFINITY, -Double.MAX_VALUE,
 			(byte) 0x12, (short) 0x1234, 0x12345678, 0x123456789abcdef0L, Float.intBitsToFloat(0x12345678), Double.longBitsToDouble(0x123456789abcdef0L),
@@ -194,7 +232,7 @@ public class YggdrasilTest {
 			new ArrayList<Integer>(Arrays.asList(1, 2, 3)), new HashSet<Integer>(Arrays.asList(1, 4, 3, 3, 2)),
 			new HashMap<Object, Object>(), new LinkedList<Integer>(Arrays.asList(4, 3, 2, 1)),
 			
-			TestEnum.SOMETHING,
+			TestEnum.SOMETHING, PETest1.PET1_0, PETest1.PETest2.PET1_1, PETest1.PET1_2, PET1_3, PETest1.PETest2.PET2_1, PETest1.PET2_2, PETest1.PETest2.PET2_0,
 			new TestClass1(), new TestClass1("foo"), new TestClass2(20)
 	};
 	
@@ -218,19 +256,19 @@ public class YggdrasilTest {
 		}
 	}
 	
-	@Test
-	public void generalXMLTest() throws IOException {
-		System.out.println();
-		for (final Object o : random) {
-			final String d = saveXML(o);
-			System.out.println(o + ": " + d);
-			System.out.println();
-			final Object l = loadXML(d);
-			assert equals(o, l) : toString(o) + " <> " + toString(l);
-			final String d2 = saveXML(l);
-			assert equals(d, d2) : toString(o) + "\n" + toString(d) + " <>\n" + toString(d2);
-		}
-	}
+//	@Test
+//	public void generalXMLTest() throws IOException {
+//		System.out.println();
+//		for (final Object o : random) {
+//			final String d = saveXML(o);
+//			System.out.println(o + ": " + d);
+//			System.out.println();
+//			final Object l = loadXML(d);
+//			assert equals(o, l) : toString(o) + " <> " + toString(l);
+//			final String d2 = saveXML(l);
+//			assert equals(d, d2) : toString(o) + "\n" + toString(d) + " <>\n" + toString(d2);
+//		}
+//	}
 	
 	@Test
 	public void keepReferencesTest() throws IOException {
@@ -244,20 +282,81 @@ public class YggdrasilTest {
 		print(m, md);
 		@SuppressWarnings("unchecked")
 		final Map<Integer, Object> ms = (Map<Integer, Object>) load(md);
-		assert ms.get(1) == ms.get(3) && ms.get(1) != ms.get(2);
+		assert ms != null && ms.get(1) == ms.get(3) && ms.get(1) != ms.get(2) : ms;
 	}
 	
-//	// write/readObject tests
-//	@Test
-//	public void serializableTests() throws IOException {
-//		final List<?> l = new ArrayList<>(Arrays.asList(random));
-//		final byte[] ld = save(l);
-//		print(l, ld);
-//		final Object n = load(ld);
-//		assert equals(n, l) : toString(n) + " <> " + toString(l);
-//	}
+	private final static class UnmodifiedClass implements YggdrasilSerializable {
+		final int unchanged;
+		
+		@SuppressWarnings("unused")
+		UnmodifiedClass() {
+			unchanged = -10;
+		}
+		
+		UnmodifiedClass(final int c) {
+			unchanged = c;
+		}
+	}
 	
-	private static boolean equals(final Object o1, final Object o2) {
+	private final static class ModifiedClass implements YggdrasilSerializable {
+		@YggdrasilID("unchanged")
+		final int changed;
+		
+		ModifiedClass() {
+			changed = -20;
+		}
+		
+		@SuppressWarnings("unused")
+		ModifiedClass(final int c) {
+			changed = c;
+		}
+	}
+	
+	final static String modifiedClassID = "something random";
+	static Class<?> currentModifiedClass = UnmodifiedClass.class;
+	static {
+		y.registerClassResolver(new ClassResolver() {
+			@Override
+			@Nullable
+			public String getID(final Class<?> c) {
+				if (c == currentModifiedClass)
+					return modifiedClassID;
+				return null;
+			}
+			
+			@Override
+			@Nullable
+			public Class<?> getClass(final String id) {
+				if (id.equals(modifiedClassID))
+					return currentModifiedClass;
+				return null;
+			}
+		});
+	}
+	
+	@Test
+	public void renameTest() throws IOException {
+		System.out.println();
+		currentModifiedClass = UnmodifiedClass.class;
+		final UnmodifiedClass o1 = new UnmodifiedClass(200);
+		final byte[] d1 = save(o1);
+		print(o1, d1);
+		currentModifiedClass = ModifiedClass.class;
+		final ModifiedClass o2 = (ModifiedClass) load(d1);
+		assert o2 != null;
+		assertEquals(o1.unchanged, o2.changed);
+		
+		currentModifiedClass = ModifiedClass.class;
+		final ModifiedClass o3 = new ModifiedClass();
+		final byte[] d3 = save(o3);
+		print(o3, d3);
+		currentModifiedClass = UnmodifiedClass.class;
+		final UnmodifiedClass o4 = (UnmodifiedClass) load(d3);
+		assert o4 != null;
+		assertEquals(o3.changed, o4.unchanged);
+	}
+	
+	private static boolean equals(final @Nullable Object o1, final @Nullable Object o2) {
 		if (o1 == null || o2 == null)
 			return o1 == o2;
 		if (o1.getClass() != o2.getClass())
@@ -290,7 +389,7 @@ public class YggdrasilTest {
 		}
 	}
 	
-	private String toString(final Object o) {
+	private String toString(final @Nullable Object o) {
 		if (o == null)
 			return "null";
 		if (o.getClass().isArray()) {
@@ -303,12 +402,12 @@ public class YggdrasilTest {
 				b.append(toString(Array.get(o, i)));
 			}
 			b.append("]");
-			return b.toString();
+			return "" + b;
 		}
-		return o.toString();
+		return "" + o;
 	}
 	
-	private final static void print(final Object o, final byte[] d) {
+	private final static void print(final @Nullable Object o, final byte[] d) {
 		System.out.print(o);
 		System.out.print(": ");
 		for (final byte b : d) {

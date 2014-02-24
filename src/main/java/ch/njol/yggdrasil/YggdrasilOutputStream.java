@@ -1,5 +1,5 @@
 /*
- *   This file is part of Yggdrasil, a data format to store object graphs.
+ *   This file is part of Yggdrasil, a data format to store object graphs, and the Java implementation thereof.
  *
  *  Yggdrasil is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -29,6 +29,8 @@ import java.io.IOException;
 import java.io.NotSerializableException;
 import java.lang.reflect.Array;
 import java.util.IdentityHashMap;
+
+import org.eclipse.jdt.annotation.Nullable;
 
 import ch.njol.yggdrasil.Fields.FieldContext;
 import ch.njol.yggdrasil.YggdrasilSerializable.YggdrasilExtendedSerializable;
@@ -60,7 +62,9 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 	private final void writePrimitive(final Object o) throws IOException {
 		final Tag t = Tag.getType(o.getClass());
 		assert t.isWrapper();
-		writeTag(t.getPrimitive());
+		final Tag p = t.getPrimitive();
+		assert p != null;
+		writeTag(p);
 		writePrimitiveValue(o);
 	}
 	
@@ -91,12 +95,16 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 	private final void writeArray(final Object array) throws IOException {
 		final int length = Array.getLength(array);
 		final Class<?> ct = array.getClass().getComponentType();
+		assert ct != null;
 		writeTag(T_ARRAY);
 		writeArrayComponentType(ct);
 		writeArrayLength(length);
 		if (ct.isPrimitive()) {
-			for (int i = 0; i < length; i++)
-				writePrimitive_(Array.get(array, i));
+			for (int i = 0; i < length; i++) {
+				final Object p = Array.get(array, i);
+				assert p != null;
+				writePrimitive_(p);
+			}
 			writeArrayEnd();
 		} else {
 			for (final Object o : (Object[]) array)
@@ -109,12 +117,20 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 	
 	protected abstract void writeEnumType(String type) throws IOException;
 	
-	protected abstract void writeEnumName(String name) throws IOException;
+	protected abstract void writeEnumID(String id) throws IOException;
 	
 	private final void writeEnum(final Enum<?> o) throws IOException {
 		writeTag(T_ENUM);
+		final Class<?> c = o.getDeclaringClass();
+		assert c != null;
+		writeEnumType(y.getID(c));
+		writeEnumID(Yggdrasil.getID(o));
+	}
+	
+	private final void writeEnum(final PseudoEnum<?> o) throws IOException {
+		writeTag(T_ENUM);
 		writeEnumType(y.getID(o.getDeclaringClass()));
-		writeEnumName(o.name());
+		writeEnumID(o.name());
 	}
 	
 	// Class
@@ -142,13 +158,14 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 	
 	protected abstract void writeNumFields(short numFields) throws IOException;
 	
-	protected abstract void writeFieldName(String name) throws IOException;
+	protected abstract void writeFieldID(String id) throws IOException;
 	
 	protected abstract void writeObjectEnd() throws IOException;
 	
-	@SuppressWarnings({"rawtypes", "unchecked"})
+	@SuppressWarnings({"rawtypes", "unchecked", "null", "unused"})
 	private final void writeGenericObject(final Object o, int ref) throws IOException {
 		final Class<?> c = o.getClass();
+		assert c != null;
 		if (!y.isSerializable(c))
 			throw new NotSerializableException(c.getName());
 		final Fields fields;
@@ -175,7 +192,7 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 		writeObjectType(y.getID(c));
 		writeNumFields((short) fields.size());
 		for (final FieldContext f : fields) {
-			writeFieldName(f.name);
+			writeFieldID(f.id);
 			if (f.isPrimitive())
 				writePrimitive(f.getPrimitive());
 			else
@@ -192,7 +209,7 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 	private int nextObjectID = 0;
 	private final IdentityHashMap<Object, Integer> writtenObjects = new IdentityHashMap<Object, Integer>();
 	
-	public final void writeObject(final Object o) throws IOException {
+	public final void writeObject(final @Nullable Object o) throws IOException {
 		if (o == null) {
 			writeNull();
 			return;
@@ -220,7 +237,10 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 				writeString((String) o);
 				return;
 			case T_ENUM:
-				writeEnum((Enum<?>) o);
+				if (o instanceof Enum)
+					writeEnum((Enum<?>) o);
+				else
+					writeEnum((PseudoEnum<?>) o);
 				return;
 			case T_CLASS:
 				writeClass((Class<?>) o);

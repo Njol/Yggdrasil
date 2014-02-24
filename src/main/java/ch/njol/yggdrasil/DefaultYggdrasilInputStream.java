@@ -1,5 +1,5 @@
 /*
- *   This file is part of Yggdrasil, a data format to store object graphs.
+ *   This file is part of Yggdrasil, a data format to store object graphs, and the Java implementation thereof.
  *
  *  Yggdrasil is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -22,7 +22,6 @@
 package ch.njol.yggdrasil;
 
 import static ch.njol.yggdrasil.Tag.*;
-import static ch.njol.yggdrasil.YggdrasilConstants.*;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -32,6 +31,8 @@ import java.lang.reflect.Array;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.eclipse.jdt.annotation.NonNull;
 
 //Naming conventions:
 // x(): read info & data (e.g. content type, contents) [i.e. no tag]
@@ -47,10 +48,10 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 		super(y);
 		this.in = in;
 		final int m = readInt();
-		if (m != I_YGGDRASIL)
+		if (m != Yggdrasil.MAGIC_NUMBER)
 			throw new StreamCorruptedException("Not an Yggdrasil stream");
 		version = readShort();
-		if (version != VERSION)
+		if (version <= 0 || version > Yggdrasil.LATEST_VERSION)
 			throw new StreamCorruptedException("Input was saved using a later version of Yggdrasil");
 	}
 	
@@ -86,10 +87,10 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 	private String readShortString() throws IOException {
 		final int length = read();
 		if (length == (T_REFERENCE.tag & 0xFF)) {
-			final int i = readInt();
+			final int i = version <= 1 ? readInt() : readUnsignedInt();
 			if (i < 0 || i > readShortStrings.size())
 				throw new StreamCorruptedException("Invalid short string reference " + i);
-			return readShortStrings.get(i);
+			return "" + readShortStrings.get(i);
 		} else {
 			final byte[] d = new byte[length];
 			readFully(d);
@@ -176,6 +177,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 		throw new StreamCorruptedException("Invalid boolean value " + r);
 	}
 	
+	@SuppressWarnings("null")
 	@Override
 	protected Object readPrimitive(final Tag type) throws IOException {
 		switch (type) {
@@ -197,7 +199,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 				return readBoolean();
 				//$CASES-OMITTED$
 			default:
-				throw new YggdrasilException("Internal error");
+				throw new YggdrasilException("Internal error; " + type);
 		}
 	}
 	
@@ -236,18 +238,20 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 	}
 	
 	@Override
-	protected String readEnumName() throws IOException {
+	protected String readEnumID() throws IOException {
 		return readShortString();
 	}
 	
 	// Class
 	
+	@SuppressWarnings("null")
 	@Override
 	protected Class<?> readClass() throws IOException {
 		Tag type;
 		int dim = 0;
 		while ((type = readTag()) == T_ARRAY)
 			dim++;
+		@NonNull
 		Class<?> c;
 		switch (type) {
 			case T_OBJECT:
@@ -273,13 +277,14 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 			case T_CLASS:
 			case T_STRING:
 				c = type.c;
+				assert c != null;
 				break;
 			case T_NULL:
 			case T_REFERENCE:
 				throw new StreamCorruptedException("unexpected tag " + type);
 			case T_ARRAY:
 			default:
-				throw new YggdrasilException("Internal error");
+				throw new YggdrasilException("Internal error; " + type);
 		}
 		while (dim-- > 0)
 			c = Array.newInstance(c, 0).getClass();
@@ -306,7 +311,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 	}
 	
 	@Override
-	protected String readFieldName() throws IOException {
+	protected String readFieldID() throws IOException {
 		return readShortString();
 	}
 	

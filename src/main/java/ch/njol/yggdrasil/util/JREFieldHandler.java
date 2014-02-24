@@ -1,5 +1,5 @@
 /*
- *   This file is part of Yggdrasil, a data format to store object graphs.
+ *   This file is part of Yggdrasil, a data format to store object graphs, and the Java implementation thereof.
  *
  *  Yggdrasil is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
  * 
  */
 
-package ch.njol.yggdrasil;
+package ch.njol.yggdrasil.util;
 
 import java.io.StreamCorruptedException;
 import java.lang.reflect.Array;
@@ -28,10 +28,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 
+import ch.njol.yggdrasil.FieldHandler;
 import ch.njol.yggdrasil.Fields.FieldContext;
+import ch.njol.yggdrasil.YggdrasilException;
 
 /**
- * Handles common JRE-related incompatible field types. This handler should be the last one to be called.
+ * Handles common JRE-related incompatible field types. This handler is not added by default and is merely a utility.
  * 
  * @author Peter Güttinger
  */
@@ -41,7 +43,15 @@ public class JREFieldHandler implements FieldHandler {
 	 * Not used
 	 */
 	@Override
-	public boolean missingField(final Object o, final FieldContext field) {
+	public boolean excessiveField(final Object o, final FieldContext field) {
+		return false;
+	}
+	
+	/**
+	 * Not used
+	 */
+	@Override
+	public boolean missingField(final Object o, final Field field) throws StreamCorruptedException {
 		return false;
 	}
 	
@@ -52,7 +62,7 @@ public class JREFieldHandler implements FieldHandler {
 	 */
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	@Override
-	public boolean incompatibleFieldType(final Object o, final Field f, final FieldContext field) throws StreamCorruptedException {
+	public boolean incompatibleField(final Object o, final Field f, final FieldContext field) throws StreamCorruptedException {
 		Object value = field.getObject();
 		if (value instanceof Object[])
 			value = Arrays.asList(value);

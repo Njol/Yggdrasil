@@ -1,5 +1,5 @@
 /*
- *   This file is part of Yggdrasil, a data format to store object graphs.
+ *   This file is part of Yggdrasil, a data format to store object graphs, and the Java implementation thereof.
  *
  *  Yggdrasil is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -34,79 +34,118 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.jdt.annotation.Nullable;
+
 import ch.njol.yggdrasil.Fields.FieldContext; // required - wtf
 import ch.njol.yggdrasil.YggdrasilSerializable.YggdrasilRobustSerializable;
 
 public final class Fields implements Iterable<FieldContext> {
 	
 	/**
-	 * Holds a field's name and value, and throws errors if primitives and objects are used incorrectly.
+	 * Holds a field's name and value, and throws {@link StreamCorruptedException}s if primitives or objects are used incorrectly.
 	 * 
 	 * @author Peter Güttinger
 	 */
 	public final static class FieldContext {
-		final String name;
+		
+		final String id;
+		
+		/** not null for if this {@link #isPrimitiveValue is a primitive} */
+		@Nullable
 		private Object value;
+		
 		private boolean isPrimitiveValue;
 		
-		FieldContext(final String name) {
-			this.name = name;
+		FieldContext(final String id) {
+			this.id = id;
 		}
 		
-		private FieldContext(final Field f, final Object o) throws IllegalArgumentException, IllegalAccessException {
-			name = f.getName();
+		FieldContext(final Field f, final Object o) throws IllegalArgumentException, IllegalAccessException {
+			id = Yggdrasil.getID(f);
 			value = f.get(o);
 			isPrimitiveValue = f.getType().isPrimitive();
 		}
 		
-		public String getName() {
-			return name;
+		public String getID() {
+			return id;
 		}
 		
 		public boolean isPrimitive() {
 			return isPrimitiveValue;
 		}
 		
+		@Nullable
 		public Class<?> getType() {
+			final Object value = this.value;
 			if (value == null)
 				return null;
-			return isPrimitiveValue ? Tag.getPrimitiveFromWrapper(value.getClass()).c : value.getClass();
+			final Class<?> c = value.getClass();
+			assert c != null;
+			return isPrimitiveValue ? Tag.getPrimitiveFromWrapper(c).c : c;
 		}
 		
+		@Nullable
 		public Object getObject() throws StreamCorruptedException {
 			if (isPrimitiveValue)
-				throw new StreamCorruptedException("field " + name + " is a primitive");
+				throw new StreamCorruptedException("field " + id + " is a primitive, but expected an object");
 			return value;
+		}
+		
+		@SuppressWarnings("unchecked")
+		@Nullable
+		public <T> T getObject(final Class<T> expectedType) throws StreamCorruptedException {
+			if (isPrimitiveValue)
+				throw new StreamCorruptedException("field " + id + " is a primitive, but expected " + expectedType);
+			final Object value = this.value;
+			if (value != null && !expectedType.isInstance(value))
+				throw new StreamCorruptedException("Field " + id + " of " + value.getClass() + ", but expected " + expectedType);
+			return (T) value;
 		}
 		
 		public Object getPrimitive() throws StreamCorruptedException {
 			if (!isPrimitiveValue)
-				throw new StreamCorruptedException("field " + name + " is not a primitive");
+				throw new StreamCorruptedException("field " + id + " is not a primitive, but expected one");
+			assert value != null;
 			return value;
 		}
 		
-		public void setObject(final Object value) {
+		@SuppressWarnings("unchecked")
+		public <T> T getPrimitive(final Class<T> expectedType) throws StreamCorruptedException {
+			if (!isPrimitiveValue)
+				throw new StreamCorruptedException("field " + id + " is not a primitive, but expected " + expectedType);
+			assert expectedType.isPrimitive() || Tag.isWrapper(expectedType);
+			final Object value = this.value;
+			assert value != null;
+			if (!(expectedType.isPrimitive() ? Tag.getWrapperClass(expectedType).isInstance(value) : expectedType.isInstance(value)))
+				throw new StreamCorruptedException("Field " + id + " of " + value.getClass() + ", but expected " + expectedType);
+			return (T) value;
+		}
+		
+		public void setObject(final @Nullable Object value) {
 			this.value = value;
 			isPrimitiveValue = false;
 		}
 		
+		@SuppressWarnings("null")
 		public void setPrimitive(final Object value) {
-			assert value != null && Tag.getPrimitiveFromWrapper(value.getClass()) != null;
+			assert value != null && Tag.isWrapper(value.getClass());
 			this.value = value;
 			isPrimitiveValue = true;
 		}
 		
 		public void setField(final Object o, final Field f, final Yggdrasil y) throws StreamCorruptedException {
 			if (Modifier.isStatic(f.getModifiers()))
-				throw new YggdrasilException("The field " + name + " of " + f.getDeclaringClass() + " is static");
+				throw new StreamCorruptedException("The field " + id + " of " + f.getDeclaringClass() + " is static");
+			if (Modifier.isTransient(f.getModifiers()))
+				throw new StreamCorruptedException("The field " + id + " of " + f.getDeclaringClass() + " is transient");
 			if (f.getType().isPrimitive() != isPrimitiveValue)
-				throw new YggdrasilException("The field " + name + " of " + f.getDeclaringClass() + " is not primitive");
+				throw new StreamCorruptedException("The field " + id + " of " + f.getDeclaringClass() + " is " + (f.getType().isPrimitive() ? "" : "not ") + "primitive");
 			try {
 				f.setAccessible(true);
 				f.set(o, value);
 			} catch (final IllegalArgumentException e) {
-				if (!(o instanceof YggdrasilRobustSerializable) || !((YggdrasilRobustSerializable) o).incompatibleFieldType(f, this))
-					y.incompatibleFieldType(o, f, this);
+				if (!(o instanceof YggdrasilRobustSerializable) || !((YggdrasilRobustSerializable) o).incompatibleField(f, this))
+					y.incompatibleField(o, f, this);
 			} catch (final IllegalAccessException e) {
 				assert false;
 			}
@@ -114,11 +153,11 @@ public final class Fields implements Iterable<FieldContext> {
 		
 		@Override
 		public int hashCode() {
-			return name.hashCode();
+			return id.hashCode();
 		}
 		
 		@Override
-		public boolean equals(final Object obj) {
+		public boolean equals(final @Nullable Object obj) {
 			if (this == obj)
 				return true;
 			if (obj == null)
@@ -126,7 +165,7 @@ public final class Fields implements Iterable<FieldContext> {
 			if (!(obj instanceof FieldContext))
 				return false;
 			final FieldContext other = (FieldContext) obj;
-			return name.equals(other.name);
+			return id.equals(other.id);
 		}
 		
 	}
@@ -146,7 +185,9 @@ public final class Fields implements Iterable<FieldContext> {
 	 */
 	public Fields(final Class<?> c) throws NotSerializableException {
 		for (final Field f : getFields(c)) {
-			fields.put(f.getName(), new FieldContext(f.getName()));
+			assert f != null;
+			final String id = Yggdrasil.getID(f);
+			fields.put(id, new FieldContext(id));
 		}
 	}
 	
@@ -157,9 +198,12 @@ public final class Fields implements Iterable<FieldContext> {
 	 * @throws NotSerializableException If a field occurs more than once (i.e. if a class has a field with the same name as a field in one of its superclasses)
 	 */
 	public Fields(final Object o) throws NotSerializableException {
-		for (final Field f : getFields(o.getClass())) {
+		final Class<?> c = o.getClass();
+		assert c != null;
+		for (final Field f : getFields(c)) {
+			assert f != null;
 			try {
-				fields.put(f.getName(), new FieldContext(f, o));
+				fields.put(Yggdrasil.getID(f), new FieldContext(f, o));
 			} catch (final IllegalArgumentException e) {
 				assert false;
 			} catch (final IllegalAccessException e) {
@@ -171,7 +215,7 @@ public final class Fields implements Iterable<FieldContext> {
 	private final static Map<Class<?>, Collection<Field>> cache = new HashMap<Class<?>, Collection<Field>>();
 	
 	/**
-	 * Gets all serialisable fields of the provided class.
+	 * Gets all serialisable fields of the provided class, including superclasses.
 	 * 
 	 * @param c The class to get the fields of
 	 * @return All non-static and non-transient fields of the given class and its superclasses
@@ -182,19 +226,23 @@ public final class Fields implements Iterable<FieldContext> {
 		if (fields != null)
 			return fields;
 		fields = new ArrayList<Field>();
+		final Set<String> ids = new HashSet<String>();
 		for (Class<?> sc = c; sc != null; sc = sc.getSuperclass()) {
 			final Field[] fs = sc.getDeclaredFields();
 			for (final Field f : fs) {
 				final int m = f.getModifiers();
 				if (Modifier.isStatic(m) || Modifier.isTransient(m))
 					continue;
-				if (fields.contains(f))
-					throw new NotSerializableException(c.getName() + ": duplicate field " + f.getName());
+				final String id = Yggdrasil.getID(f);
+				if (ids.contains(id))
+					throw new NotSerializableException(c + "/" + sc + ": duplicate field id '" + id + "'");
 				f.setAccessible(true);
 				fields.add(f);
+				ids.add(id);
 			}
 		}
 		fields = Collections.unmodifiableCollection(fields);
+		assert fields != null;
 		cache.put(c, fields);
 		return fields;
 	}
@@ -210,17 +258,25 @@ public final class Fields implements Iterable<FieldContext> {
 	 * @throws NotSerializableException
 	 */
 	public void setFields(final Object o, final Yggdrasil y) throws StreamCorruptedException, NotSerializableException {
-		final Set<FieldContext> missing = new HashSet<FieldContext>(fields.values());
-		for (final Field f : getFields(o.getClass())) {
-			final FieldContext c = fields.get(f.getName());
-			if (c == null)
-				throw new StreamCorruptedException("Missing field " + f.getName() + " of " + o.getClass() + " in stream");
-			c.setField(o, f, y);
-			missing.remove(c);
+		final Set<FieldContext> excessive = new HashSet<FieldContext>(fields.values());
+		final Class<?> oc = o.getClass();
+		assert oc != null;
+		for (final Field f : getFields(oc)) {
+			assert f != null;
+			final String id = Yggdrasil.getID(f);
+			final FieldContext c = fields.get(id);
+			if (c == null) {
+				if (!(o instanceof YggdrasilRobustSerializable) || !((YggdrasilRobustSerializable) o).missingField(f))
+					y.missingField(o, f);
+			} else {
+				c.setField(o, f, y);
+			}
+			excessive.remove(c);
 		}
-		for (final FieldContext f : missing) {
-			if (!(o instanceof YggdrasilRobustSerializable) || !((YggdrasilRobustSerializable) o).missingField(f))
-				y.missingField(o, f);
+		for (final FieldContext f : excessive) {
+			assert f != null;
+			if (!(o instanceof YggdrasilRobustSerializable) || !((YggdrasilRobustSerializable) o).excessiveField(f))
+				y.excessiveField(o, f);
 		}
 	}
 	
@@ -231,28 +287,29 @@ public final class Fields implements Iterable<FieldContext> {
 		return fields.size();
 	}
 	
-	public void putObject(final String field, final Object value) {
-		FieldContext c = fields.get(field);
+	public void putObject(final String fieldID, final @Nullable Object value) {
+		FieldContext c = fields.get(fieldID);
 		if (c == null)
-			fields.put(field, c = new FieldContext(field));
+			fields.put(fieldID, c = new FieldContext(fieldID));
 		c.setObject(value);
 	}
 	
-	public void putPrimitive(final String field, final Object value) {
-		FieldContext c = fields.get(field);
+	public void putPrimitive(final String fieldID, final Object value) {
+		FieldContext c = fields.get(fieldID);
 		if (c == null)
-			fields.put(field, c = new FieldContext(field));
+			fields.put(fieldID, c = new FieldContext(fieldID));
 		c.setPrimitive(value);
 	}
 	
 	/**
-	 * @param field A field's name
+	 * @param fieldID A field's id
 	 * @return Whether the field is defined
 	 */
-	public boolean contains(final String field) {
-		return fields.containsKey(field);
+	public boolean contains(final String fieldID) {
+		return fields.containsKey(fieldID);
 	}
 	
+	@Nullable
 	public Object getObject(final String field) throws StreamCorruptedException {
 		final FieldContext c = fields.get(field);
 		if (c == null)
@@ -260,37 +317,31 @@ public final class Fields implements Iterable<FieldContext> {
 		return c.getObject();
 	}
 	
-	@SuppressWarnings("unchecked")
-	public <T> T getObject(final String field, final Class<T> expectedType) throws StreamCorruptedException {
+	@Nullable
+	public <T> T getObject(final String fieldID, final Class<T> expectedType) throws StreamCorruptedException {
 		assert !expectedType.isPrimitive();
-		final FieldContext c = fields.get(field);
+		final FieldContext c = fields.get(fieldID);
 		if (c == null)
-			throw new StreamCorruptedException("Nonexistent field " + field);
-		final Object o = c.getObject();
-		if (o != null && !expectedType.isInstance(o))
-			throw new StreamCorruptedException("Field " + field + " of " + o.getClass() + " but expected " + expectedType);
-		return (T) o;
+			throw new StreamCorruptedException("Nonexistent field " + fieldID);
+		return c.getObject(expectedType);
 	}
 	
-	public Object getPrimitive(final String field) throws StreamCorruptedException {
-		final FieldContext c = fields.get(field);
+	public Object getPrimitive(final String fieldID) throws StreamCorruptedException {
+		final FieldContext c = fields.get(fieldID);
 		if (c == null)
-			throw new StreamCorruptedException("Nonexistent field " + field);
+			throw new StreamCorruptedException("Nonexistent field " + fieldID);
 		return c.getPrimitive();
 	}
 	
-	@SuppressWarnings("unchecked")
-	public <T> T getPrimitive(final String field, final Class<T> expectedType) throws StreamCorruptedException {
-		assert expectedType.isPrimitive() || Tag.getPrimitiveFromWrapper(expectedType) != null;
-		final FieldContext c = fields.get(field);
+	public <T> T getPrimitive(final String fieldID, final Class<T> expectedType) throws StreamCorruptedException {
+		assert expectedType.isPrimitive() || Tag.getPrimitiveFromWrapper(expectedType).isPrimitive();
+		final FieldContext c = fields.get(fieldID);
 		if (c == null)
-			throw new StreamCorruptedException("Nonexistent field " + field);
-		final Object o = c.getPrimitive();
-		if (o != null && !(expectedType.isPrimitive() ? Tag.getType(expectedType).getWrapper().c.isInstance(o) : expectedType.isInstance(o)))
-			throw new StreamCorruptedException("Field " + field + " of " + o.getClass() + " but expected " + expectedType);
-		return (T) o;
+			throw new StreamCorruptedException("Nonexistent field " + fieldID);
+		return c.getPrimitive(expectedType);
 	}
 	
+	@Nullable
 	public <T> T getAndRemoveObject(final String field, final Class<T> expectedType) throws StreamCorruptedException {
 		final T t = getObject(field, expectedType);
 		removeField(field);
@@ -306,13 +357,14 @@ public final class Fields implements Iterable<FieldContext> {
 	/**
 	 * Removes a field and its value from this Fields object.
 	 * 
-	 * @param field The name of the field to remove
+	 * @param fieldID The id of the field to remove
 	 * @return Whether a field with the given name was actually defined
 	 */
-	public boolean removeField(final String field) {
-		return fields.remove(field) != null;
+	public boolean removeField(final String fieldID) {
+		return fields.remove(fieldID) != null;
 	}
 	
+	@SuppressWarnings("null")
 	@Override
 	public Iterator<FieldContext> iterator() {
 		return fields.values().iterator();

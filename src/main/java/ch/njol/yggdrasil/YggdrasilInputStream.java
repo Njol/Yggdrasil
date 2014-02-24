@@ -1,5 +1,5 @@
 /*
- *   This file is part of Yggdrasil, a data format to store object graphs.
+ *   This file is part of Yggdrasil, a data format to store object graphs, and the Java implementation thereof.
  *
  *  Yggdrasil is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -30,8 +30,9 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.jdt.annotation.Nullable;
+
 import ch.njol.yggdrasil.YggdrasilSerializable.YggdrasilExtendedSerializable;
-import ch.njol.yggdrasil.YggdrasilSerializable.YggdrasilRobustEnum;
 
 public abstract class YggdrasilInputStream implements Closeable {
 	
@@ -79,25 +80,24 @@ public abstract class YggdrasilInputStream implements Closeable {
 	
 	protected abstract Class<?> readEnumType() throws IOException;
 	
-	protected abstract String readEnumName() throws IOException;
+	protected abstract String readEnumID() throws IOException;
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	private final Enum<?> readEnum() throws IOException {
+	private final Object readEnum() throws IOException {
 		final Class<?> c = readEnumType();
-		if (!Enum.class.isAssignableFrom(c))
+		final String id = readEnumID();
+		if (Enum.class.isAssignableFrom(c)) {
+			return Yggdrasil.getEnumConstant((Class) c, id);
+		} else if (PseudoEnum.class.isAssignableFrom(c)) {
+			final Object o = PseudoEnum.valueOf((Class) c, id);
+			if (o != null)
+				return o;
+//			if (YggdrasilRobustPseudoEnum.class.isAssignableFrom(c)) {
+//				// TODO create this and a handler (for Enums as well)
+//			}
+			throw new StreamCorruptedException("Enum constant " + id + " does not exist in " + c);
+		} else {
 			throw new StreamCorruptedException(c + " is not an enum type");
-		final String name = readEnumName();
-		try {
-			return Enum.valueOf((Class<Enum>) c, name);
-		} catch (final IllegalArgumentException e) {
-			if (YggdrasilRobustEnum.class.isAssignableFrom(c)) {
-				final Object[] cs = c.getEnumConstants();
-				if (cs.length == 0)
-					throw new StreamCorruptedException(c + " does not have any enum constants");
-				return ((YggdrasilRobustEnum) cs[0]).missingConstant(name);
-			} else {
-				throw new StreamCorruptedException("Enum constant " + name + " does not exist in " + c);
-			}
 		}
 	}
 	
@@ -115,18 +115,18 @@ public abstract class YggdrasilInputStream implements Closeable {
 	
 	protected abstract short readNumFields() throws IOException;
 	
-	protected abstract String readFieldName() throws IOException;
+	protected abstract String readFieldID() throws IOException;
 	
 	private final Fields readFields() throws IOException {
 		final Fields fields = new Fields();
 		final short numFields = readNumFields();
 		for (int i = 0; i < numFields; i++) {
-			final String s = readFieldName();
+			final String id = readFieldID();
 			final Tag t = readTag();
 			if (t.isPrimitive())
-				fields.putPrimitive(s, readPrimitive(t));
+				fields.putPrimitive(id, readPrimitive(t));
 			else
-				fields.putObject(s, readObject(t));
+				fields.putObject(id, readObject(t));
 		}
 		return fields;
 	}
@@ -135,12 +135,14 @@ public abstract class YggdrasilInputStream implements Closeable {
 	
 	private final List<Object> readObjects = new ArrayList<Object>();
 	
+	@Nullable
 	public final Object readObject() throws IOException {
 		final Tag t = readTag();
 		return readObject(t);
 	}
 	
 	@SuppressWarnings("unchecked")
+	@Nullable
 	public final <T> T readObject(final Class<T> expectedType) throws IOException {
 		final Tag t = readTag();
 		final Object o = readObject(t);
@@ -149,7 +151,8 @@ public abstract class YggdrasilInputStream implements Closeable {
 		return (T) o;
 	}
 	
-	@SuppressWarnings({"rawtypes", "unchecked"})
+	@SuppressWarnings({"rawtypes", "unchecked", "null", "unused"})
+	@Nullable
 	private final Object readObject(final Tag t) throws IOException {
 		if (t == T_NULL)
 			return null;
@@ -167,6 +170,7 @@ public abstract class YggdrasilInputStream implements Closeable {
 			case T_ARRAY: {
 				final Class<?> c = readArrayComponentType();
 				o = Array.newInstance(c, readArrayLength());
+				assert o != null;
 				readObjects.add(o);
 				readArrayContents(o);
 				return o;
@@ -193,6 +197,8 @@ public abstract class YggdrasilInputStream implements Closeable {
 					readObjects.set(ref, o);
 				} else {
 					o = y.newInstance(c);
+					if (o == null)
+						throw new StreamCorruptedException();
 					readObjects.add(o);
 					final Fields fields = readFields();
 					if (s != null) {
@@ -213,7 +219,9 @@ public abstract class YggdrasilInputStream implements Closeable {
 			case T_INT_OBJ:
 			case T_LONG_OBJ:
 			case T_SHORT_OBJ:
-				o = readPrimitive(t.getPrimitive());
+				final Tag p = t.getPrimitive();
+				assert p != null;
+				o = readPrimitive(p);
 				break;
 			case T_BYTE:
 			case T_BOOLEAN:

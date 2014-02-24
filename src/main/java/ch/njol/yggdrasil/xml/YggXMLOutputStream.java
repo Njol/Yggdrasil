@@ -1,5 +1,5 @@
 /*
- *   This file is part of Yggdrasil, a data format to store object graphs.
+ *   This file is part of Yggdrasil, a data format to store object graphs, and the Java implementation thereof.
  *
  *  Yggdrasil is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -27,32 +27,43 @@ import java.io.IOException;
 import java.io.NotSerializableException;
 import java.io.OutputStream;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
+import org.eclipse.jdt.annotation.Nullable;
+
 import ch.njol.util.StringUtils;
 import ch.njol.yggdrasil.Tag;
 import ch.njol.yggdrasil.Yggdrasil;
-import ch.njol.yggdrasil.YggdrasilConstants;
 import ch.njol.yggdrasil.YggdrasilException;
 import ch.njol.yggdrasil.YggdrasilOutputStream;
 
+/**
+ * @deprecated XML has so many quirks that storing arbitrary data cannot be guaranteed.
+ * @author Peter Güttinger
+ */
+@Deprecated
 public final class YggXMLOutputStream extends YggdrasilOutputStream {
 	
 	private final OutputStream os;
 	private final XMLStreamWriter out;
 	
+	private final short version;
+	
+	@SuppressWarnings("null")
 	public YggXMLOutputStream(final Yggdrasil y, final OutputStream out) throws IOException, FactoryConfigurationError {
 		super(y);
+		version = y.version;
 		try {
 			os = out;
 			this.out = XMLOutputFactory.newFactory().createXMLStreamWriter(out, "UTF-8");
 			this.out.writeStartDocument("utf-8", "1.0");
 			this.out.writeStartElement("yggdrasil");
-			writeAttribute("version", "" + YggdrasilConstants.VERSION);
+			writeAttribute("version", "" + version);
 		} catch (final XMLStreamException e) {
 			throw new IOException(e);
 		}
@@ -60,6 +71,7 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 	
 	// private
 	
+	@SuppressWarnings("null")
 	private String getTypeName(Class<?> c) throws NotSerializableException {
 		String a = "";
 		while (c.isArray()) {
@@ -102,6 +114,22 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 		return s + a;
 	}
 	
+	@SuppressWarnings("null")
+	private final static Pattern valid = Pattern.compile("[\\u0009 \\u000A \\u000D \\u0020-\\u007E \\u0085 \\u00A0-\\uD7FF \\uE000-\\uFFFD \\x{10000}–\\x{10FFFF}]*", Pattern.COMMENTS);
+	
+	private final static void validateString(final String s) throws IOException {
+		if (!valid.matcher(s).matches())
+			throw new IOException("The string '" + s + "' contains characters illegal in XML 1.0: '" + toUnicodeEscapes("" + valid.matcher(s).replaceAll("")) + "'");
+	}
+	
+	private final static String toUnicodeEscapes(final String s) {
+		final StringBuilder b = new StringBuilder();
+		for (int i = 0; i < s.length(); i++) {
+			b.append(String.format("\\u%04x", (int) s.charAt(i)));
+		}
+		return "" + b;
+	}
+	
 	private void writeEndElement() throws IOException {
 		try {
 			out.writeEndElement();
@@ -111,6 +139,8 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 	}
 	
 	private void writeAttribute(final String s, final String value) throws IOException {
+		validateString(s);
+		validateString(value);
 		try {
 			out.writeAttribute(s, value);
 		} catch (final XMLStreamException e) {
@@ -119,6 +149,7 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 	}
 	
 	private void writeCharacters(final String s) throws IOException {
+		validateString(s);
 		try {
 			out.writeCharacters(s);
 		} catch (final XMLStreamException e) {
@@ -135,7 +166,7 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 				out.writeEmptyElement(t.name);
 			else
 				out.writeStartElement(t.name);
-			writeName();
+			writeID();
 		} catch (final XMLStreamException e) {
 			throw new IOException(e);
 		}
@@ -151,6 +182,7 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 	
 	@Override
 	protected void writePrimitive_(final Object o) throws IOException {
+		@SuppressWarnings("null")
 		final Tag type = getPrimitiveFromWrapper(o.getClass());
 		final int size;
 		final long value;
@@ -228,8 +260,8 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 	}
 	
 	@Override
-	protected void writeEnumName(final String name) throws IOException {
-		writeCharacters(name);
+	protected void writeEnumID(final String id) throws IOException {
+		writeCharacters(id);
 		writeEndElement();
 	}
 	
@@ -262,18 +294,19 @@ public final class YggXMLOutputStream extends YggdrasilOutputStream {
 	}
 	
 	// name of the next field
-	private String name = null;
+	@Nullable
+	private String id = null;
 	
-	private final void writeName() throws IOException {
-		if (name != null) {
-			writeAttribute("name", name);
-			name = null;
+	private final void writeID() throws IOException {
+		if (id != null) {
+			writeAttribute("id", id);
+			id = null;
 		}
 	}
 	
 	@Override
-	protected void writeFieldName(final String name) throws IOException {
-		this.name = name;
+	protected void writeFieldID(final String id) throws IOException {
+		this.id = id;
 	}
 	
 	@Override

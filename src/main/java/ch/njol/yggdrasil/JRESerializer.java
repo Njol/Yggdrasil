@@ -1,5 +1,5 @@
 /*
- *   This file is part of Yggdrasil, a data format to store object graphs.
+ *   This file is part of Yggdrasil, a data format to store object graphs, and the Java implementation thereof.
  *
  *  Yggdrasil is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,6 +31,8 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.jdt.annotation.Nullable;
+
 public class JRESerializer extends YggdrasilSerializer<Object> {
 	
 	private final static Class<?>[] supportedClasses = {
@@ -42,6 +44,7 @@ public class JRESerializer extends YggdrasilSerializer<Object> {
 	private final static Set<Class<?>> set = new HashSet<Class<?>>(Arrays.asList(supportedClasses));
 	
 	@Override
+	@Nullable
 	public Class<?> getClass(final String id) {
 		for (final Class<?> c : supportedClasses)
 			if (c.getSimpleName().equals(id))
@@ -50,6 +53,7 @@ public class JRESerializer extends YggdrasilSerializer<Object> {
 	}
 	
 	@Override
+	@Nullable
 	public String getID(final Class<?> c) {
 		if (set.contains(c))
 			return c.getSimpleName();
@@ -59,7 +63,7 @@ public class JRESerializer extends YggdrasilSerializer<Object> {
 	@Override
 	public Fields serialize(final Object o) {
 		if (!set.contains(o.getClass()))
-			return null;
+			throw new IllegalArgumentException();
 		final Fields f = new Fields();
 		if (o instanceof Collection) {
 			final Collection<?> c = ((Collection<?>) o);
@@ -74,6 +78,7 @@ public class JRESerializer extends YggdrasilSerializer<Object> {
 	}
 	
 	@Override
+	@Nullable
 	public <T> T newInstance(final Class<T> c) {
 		try {
 			return c.newInstance();
@@ -94,12 +99,15 @@ public class JRESerializer extends YggdrasilSerializer<Object> {
 		try {
 			if (o instanceof Collection) {
 				final Collection<?> c = ((Collection<?>) o);
-				c.addAll((Collection) Arrays.asList((Object[]) fields.getObject("values")));
+				final Object[] values = fields.getObject("values", Object[].class);
+				if (values == null)
+					throw new StreamCorruptedException();
+				c.addAll((Collection) Arrays.asList(values));
 				return;
 			} else if (o instanceof Map) {
 				final Map<?, ?> m = ((Map<?, ?>) o);
-				final Object[] keys = (Object[]) fields.getObject("keys"), values = (Object[]) fields.getObject("values");
-				if (keys.length != values.length)
+				final Object[] keys = fields.getObject("keys", Object[].class), values = fields.getObject("values", Object[].class);
+				if (keys == null || values == null || keys.length != values.length)
 					throw new StreamCorruptedException();
 				for (int i = 0; i < keys.length; i++)
 					((Map) m).put(keys[i], values[i]);

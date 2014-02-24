@@ -1,5 +1,5 @@
 /*
- *   This file is part of Yggdrasil, a data format to store object graphs.
+ *   This file is part of Yggdrasil, a data format to store object graphs, and the Java implementation thereof.
  *
  *  Yggdrasil is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -22,7 +22,6 @@
 package ch.njol.yggdrasil;
 
 import static ch.njol.yggdrasil.Tag.*;
-import static ch.njol.yggdrasil.YggdrasilConstants.*;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -33,11 +32,14 @@ public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
 	
 	private final OutputStream out;
 	
+	private final short version;
+	
 	public DefaultYggdrasilOutputStream(final Yggdrasil y, final OutputStream out) throws IOException {
 		super(y);
 		this.out = out;
-		writeInt(I_YGGDRASIL);
-		writeShort(VERSION);
+		version = y.version;
+		writeInt(Yggdrasil.MAGIC_NUMBER);
+		writeShort(version);
 	}
 	
 	// private
@@ -60,8 +62,13 @@ public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
 	private void writeShortString(final String s) throws IOException {
 		if (writtenShortStrings.containsKey(s)) {
 			writeTag(T_REFERENCE);
-			writeInt(writtenShortStrings.get(s));
+			if (version <= 1)
+				writeInt(writtenShortStrings.get(s));
+			else
+				writeUnsignedInt(writtenShortStrings.get(s));
 		} else {
+			if (nextShortStringID < 0)
+				throw new YggdrasilException("Too many field names/class IDs (max: " + Integer.MAX_VALUE + ")");
 			final byte[] d = s.getBytes(StandardCharsets.UTF_8);
 			if (d.length >= (T_REFERENCE.tag & 0xFF))
 				throw new YggdrasilException("Field name or Class ID too long: " + s);
@@ -100,7 +107,7 @@ public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
 	
 	private void writeUnsignedInt(final int i) throws IOException {
 		assert i >= 0;
-		if (i <= 0x7FFFF)
+		if (i <= 0x7FFF)
 			writeShort((short) (0x8000 | i));
 		else
 			writeInt(i);
@@ -133,6 +140,7 @@ public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
 		write(b ? 1 : 0);
 	}
 	
+	@SuppressWarnings("null")
 	@Override
 	protected void writePrimitive_(final Object o) throws IOException {
 		switch (getPrimitiveFromWrapper(o.getClass())) {
@@ -202,6 +210,7 @@ public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
 		writeClass_(c);
 	}
 	
+	@SuppressWarnings("null")
 	private void writeClass_(Class<?> c) throws IOException {
 		while (c.isArray()) {
 			writeTag(T_ARRAY);
@@ -250,8 +259,8 @@ public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
 	}
 	
 	@Override
-	protected void writeEnumName(final String name) throws IOException {
-		writeShortString(name);
+	protected void writeEnumID(final String id) throws IOException {
+		writeShortString(id);
 	}
 	
 	// generic Object
@@ -267,8 +276,8 @@ public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
 	}
 	
 	@Override
-	protected void writeFieldName(final String name) throws IOException {
-		writeShortString(name);
+	protected void writeFieldID(final String id) throws IOException {
+		writeShortString(id);
 	}
 	
 	@Override

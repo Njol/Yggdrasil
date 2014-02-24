@@ -1,5 +1,5 @@
 /*
- *   This file is part of Yggdrasil, a data format to store object graphs.
+ *   This file is part of Yggdrasil, a data format to store object graphs, and the Java implementation thereof.
  *
  *  Yggdrasil is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -24,6 +24,8 @@ package ch.njol.yggdrasil;
 import java.io.NotSerializableException;
 import java.io.StreamCorruptedException;
 
+import org.eclipse.jdt.annotation.Nullable;
+
 /**
  * Utility to be able to save and load classes with Yggdrasil that the user has no control of, e.g. classes of an external API.
  * 
@@ -32,6 +34,7 @@ import java.io.StreamCorruptedException;
 public abstract class YggdrasilSerializer<T> implements ClassResolver {
 	
 	@Override
+	@Nullable
 	public abstract Class<? extends T> getClass(String id);
 	
 	/**
@@ -63,8 +66,9 @@ public abstract class YggdrasilSerializer<T> implements ClassResolver {
 	 * Creates a new instance of the given class.
 	 * 
 	 * @param c The class as read from stream
-	 * @return A new instance of the given class. Must not be null.
+	 * @return A new instance of the given class. Must not be null if {@link #canBeInstantiated(Class)} returned true.
 	 */
+	@Nullable
 	public abstract <E extends T> E newInstance(Class<E> c);
 	
 	/**

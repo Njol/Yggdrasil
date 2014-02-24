@@ -1,5 +1,5 @@
 /*
- *   This file is part of Yggdrasil, a data format to store object graphs.
+ *   This file is part of Yggdrasil, a data format to store object graphs, and the Java implementation thereof.
  *
  *  Yggdrasil is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -35,7 +35,16 @@ public interface FieldHandler {
 	 * @param field The field read from stream
 	 * @return Whether this Handler handled the request
 	 */
-	public boolean missingField(Object o, FieldContext field) throws StreamCorruptedException;
+	public boolean excessiveField(Object o, FieldContext field) throws StreamCorruptedException;
+	
+	/**
+	 * Called if a field was not found in the stream.
+	 * 
+	 * @param o The object whose filed is missing
+	 * @param field The field that didn't occur in the stream
+	 * @return Whether this Handler handled the request
+	 */
+	public boolean missingField(Object o, Field field) throws StreamCorruptedException;
 	
 	/**
 	 * Called when a loaded value is not compatible with the type of a field.
@@ -45,6 +54,6 @@ public interface FieldHandler {
 	 * @param field The field read from stream
 	 * @return Whether this Handler handled the request
 	 */
-	public boolean incompatibleFieldType(Object o, Field f, FieldContext field) throws StreamCorruptedException;
+	public boolean incompatibleField(Object o, Field f, FieldContext field) throws StreamCorruptedException;
 	
 }

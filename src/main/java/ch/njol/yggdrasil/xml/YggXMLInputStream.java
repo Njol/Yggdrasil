@@ -15,7 +15,7 @@
  *  along with Skript.  If not, see <http://www.gnu.org/licenses/>.
  * 
  * 
- * Copyright 2013 Peter Güttinger
+ * Copyright 2013-2014 Peter Güttinger
  * 
  */
 
@@ -91,7 +91,7 @@ public final class YggXMLInputStream extends YggdrasilInputStream {
 		if (t != null)
 			c = t.c;
 		else
-			c = y.getClass(s);
+			c = yggdrasil.getClass(s);
 		if (c == null)
 			throw new StreamCorruptedException("Invalid type " + s);
 		if (dim == 0)

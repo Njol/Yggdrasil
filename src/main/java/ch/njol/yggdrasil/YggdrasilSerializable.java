@@ -15,7 +15,7 @@
  *  along with Skript.  If not, see <http://www.gnu.org/licenses/>.
  * 
  * 
- * Copyright 2013 Peter Güttinger
+ * Copyright 2013-2014 Peter Güttinger
  * 
  */
 
@@ -50,8 +50,8 @@ public interface YggdrasilSerializable {
 		 * 
 		 * @param field The Java field
 		 * @param value The field read from stream
-		 * @return Whether the field was handled. If false, yggdrasil.
-		 *         <tt>{@link Yggdrasil#incompatibleField(Object, Field, FieldContext) incompatibleField}(this, field, value)</tt> will be called.
+		 * @return Whether the field was handled. If false,
+		 *         <tt>yggdrasil.{@link Yggdrasil#incompatibleField(Object, Field, FieldContext) incompatibleField}(this, field, value)</tt> will be called.
 		 */
 		@SuppressWarnings("null")
 		public boolean incompatibleField(@NonNull Field field, @NonNull FieldContext value) throws StreamCorruptedException;
@@ -60,7 +60,7 @@ public interface YggdrasilSerializable {
 		 * Called if a field was read from stream which does not exist in this class.
 		 * 
 		 * @param field The field read from stream
-		 * @return Whether the field was handled. If false, yggdrasil.<tt>{@link Yggdrasil#excessiveField(Object, FieldContext) excessiveField}(this, field)</tt> will be called.
+		 * @return Whether the field was handled. If false, <tt>yggdrasil.{@link Yggdrasil#excessiveField(Object, FieldContext) excessiveField}(this, field)</tt> will be called.
 		 */
 		@SuppressWarnings("null")
 		public boolean excessiveField(@NonNull FieldContext field) throws StreamCorruptedException;
@@ -69,8 +69,8 @@ public interface YggdrasilSerializable {
 		 * Called if a field was not found in the stream.
 		 * 
 		 * @param field The field that did not occur in the stream
-		 * @return Whether the field was handled (e.g. true if the default value is fine). If false, yggdrasil.
-		 *         <tt>{@link Yggdrasil#missingField(Object, Field) missingField}(this, field)</tt> will be called.
+		 * @return Whether the field was handled (e.g. true if the default value is fine). If false,
+		 *         <tt>yggdrasil.{@link Yggdrasil#missingField(Object, Field) missingField}(this, field)</tt> will be called.
 		 */
 		@SuppressWarnings("null")
 		public boolean missingField(@NonNull Field field) throws StreamCorruptedException;
@@ -88,7 +88,7 @@ public interface YggdrasilSerializable {
 		 * Called when an enum constant is read from stream that does not exist in this enum.
 		 * <p>
 		 * This method will be called on an arbitrary enum constant. An exception will be thrown if this enum is empty (because this method won't be able to return anything
-		 * anyways).
+		 * anyway).
 		 * 
 		 * @param name The name read from stream
 		 * @return The renamed enum constant or null if the read string is invalid. If the returned Enum is not an instance of this enum type an exception will be thrown.
@@ -119,10 +119,10 @@ public interface YggdrasilSerializable {
 		
 		/**
 		 * Deserialises this object. No fields have been set when this method is called, use <tt>fields.{@link Fields#setFields setFields}(this, yggdrasil)</tt> to set all
-		 * compatible non-transient and non-static fields (and call incompatible/missing field handlers if applicable &ndash; this implies that errors will be thrown if the fileds
+		 * compatible non-transient and non-static fields (and call incompatible/missing field handlers if applicable &ndash; this implies that errors will be thrown if the fields
 		 * object is invalid).
 		 * <p>
-		 * You can use <tt>fields.{@link Fields#setFields(Object, Yggdrasil) setFields}(this, yggdrasil);</tt> to emulate the default behaviour.
+		 * You can use <tt>fields.{@link Fields#setFields(Object) setFields}(this);</tt> to emulate the default behaviour.
 		 * 
 		 * @param fields A Fields object containing all fields read from stream
 		 * @throws StreamCorruptedException If the Fields object is invalid, i.e. was not written by {@link #serialize()} or Yggrdasil's default serialisation.

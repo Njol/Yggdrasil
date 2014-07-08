@@ -15,7 +15,7 @@
  *  along with Skript.  If not, see <http://www.gnu.org/licenses/>.
  * 
  * 
- * Copyright 2013 Peter Güttinger
+ * Copyright 2013-2014 Peter Güttinger
  * 
  */
 
@@ -34,11 +34,14 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import javax.annotation.concurrent.NotThreadSafe;
+
 import org.eclipse.jdt.annotation.Nullable;
 
 import ch.njol.yggdrasil.Fields.FieldContext; // required - wtf
 import ch.njol.yggdrasil.YggdrasilSerializable.YggdrasilRobustSerializable;
 
+@NotThreadSafe
 public final class Fields implements Iterable<FieldContext> {
 	
 	/**
@@ -46,11 +49,12 @@ public final class Fields implements Iterable<FieldContext> {
 	 * 
 	 * @author Peter Güttinger
 	 */
+	@NotThreadSafe
 	public final static class FieldContext {
 		
 		final String id;
 		
-		/** not null for if this {@link #isPrimitiveValue is a primitive} */
+		/** not null if this {@link #isPrimitiveValue is a primitive} */
 		@Nullable
 		private Object value;
 		
@@ -170,12 +174,21 @@ public final class Fields implements Iterable<FieldContext> {
 		
 	}
 	
+	@Nullable
+	private final Yggdrasil yggdrasil;
+	
 	private final Map<String, FieldContext> fields = new HashMap<String, FieldContext>();
 	
 	/**
 	 * Creates an empty Fields object.
 	 */
-	public Fields() {}
+	public Fields() {
+		yggdrasil = null;
+	}
+	
+	public Fields(final Yggdrasil yggdrasil) {
+		this.yggdrasil = yggdrasil;
+	}
 	
 	/**
 	 * Creates a fields object and initialises it with all non-transient and non-static fields of the given class and its superclasses.
@@ -183,7 +196,8 @@ public final class Fields implements Iterable<FieldContext> {
 	 * @param c Some class
 	 * @throws NotSerializableException If a field occurs more than once (i.e. if a class has a field with the same name as a field in one of its superclasses)
 	 */
-	public Fields(final Class<?> c) throws NotSerializableException {
+	public Fields(final Class<?> c, final Yggdrasil yggdrasil) throws NotSerializableException {
+		this.yggdrasil = yggdrasil;
 		for (final Field f : getFields(c)) {
 			assert f != null;
 			final String id = Yggdrasil.getID(f);
@@ -198,6 +212,17 @@ public final class Fields implements Iterable<FieldContext> {
 	 * @throws NotSerializableException If a field occurs more than once (i.e. if a class has a field with the same name as a field in one of its superclasses)
 	 */
 	public Fields(final Object o) throws NotSerializableException {
+		this(o, null);
+	}
+	
+	/**
+	 * Creates a fields object and initialises it with all non-transient and non-static fields of the given object.
+	 * 
+	 * @param o Some object
+	 * @throws NotSerializableException If a field occurs more than once (i.e. if a class has a field with the same name as a field in one of its superclasses)
+	 */
+	public Fields(final Object o, @Nullable final Yggdrasil yggdrasil) throws NotSerializableException {
+		this.yggdrasil = yggdrasil;
 		final Class<?> c = o.getClass();
 		assert c != null;
 		for (final Field f : getFields(c)) {
@@ -251,13 +276,14 @@ public final class Fields implements Iterable<FieldContext> {
 	 * Sets all fields of the given Object to the values stored in this Fields object.
 	 * 
 	 * @param o The object whose fields should be set
-	 * @param y A reference to the Yggdrasil object used for loading - this is required for incompatible or missing fields. You can use <tt>null</tt> if your class implements
-	 *            {@link YggdrasilRobustSerializable} and handles <i>all</i> fields, or if you are sure that <tt>fields</tt> only contains existing fields. A
-	 *            {@link NullPointerException} may be thrown otherwise.
 	 * @throws StreamCorruptedException
 	 * @throws NotSerializableException
+	 * @throws YggdrasilException If this was called on a Fields object not created by Yggdrasil itself
 	 */
-	public void setFields(final Object o, final Yggdrasil y) throws StreamCorruptedException, NotSerializableException {
+	public void setFields(final Object o) throws StreamCorruptedException, NotSerializableException {
+		final Yggdrasil y = yggdrasil;
+		if (y == null)
+			throw new YggdrasilException("");
 		final Set<FieldContext> excessive = new HashSet<FieldContext>(fields.values());
 		final Class<?> oc = o.getClass();
 		assert oc != null;
@@ -278,6 +304,12 @@ public final class Fields implements Iterable<FieldContext> {
 			if (!(o instanceof YggdrasilRobustSerializable) || !((YggdrasilRobustSerializable) o).excessiveField(f))
 				y.excessiveField(o, f);
 		}
+	}
+	
+	@Deprecated
+	public void setFields(final Object o, final Yggdrasil y) throws StreamCorruptedException, NotSerializableException {
+		assert yggdrasil == y;
+		setFields(o);
 	}
 	
 	/**

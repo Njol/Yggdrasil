@@ -15,7 +15,7 @@
  *  along with Skript.  If not, see <http://www.gnu.org/licenses/>.
  * 
  * 
- * Copyright 2013 Peter Güttinger
+ * Copyright 2013-2014 Peter Güttinger
  * 
  */
 
@@ -51,9 +51,9 @@ public abstract class YggdrasilSerializer<T> implements ClassResolver {
 	/**
 	 * Whether an instance of the given class can be dynamically created. If this method returns false, {@link #newInstance(Class)} and {@link #deserialize(Object, Fields)} will
 	 * not be called for the given class, but {@link #deserialize(Class, Fields)} will be used instead, and having any reference to an object of the given class in its own fields'
-	 * graph will cause Yggdrasil to throw an exception upon serialisation as no reference to the object will be available when deserialising the object.
+	 * graph will cause Yggdrasil to throw an exception upon serialisation as no reference to the object will be available when deserialising the object. // TODO allow this
 	 * <p>
-	 * Please note that you must not change the return value of this function ever - it is not saved in the stream.
+	 * Please note that you must not change the return value of this function ever - it is not saved in the stream. // TODO clarify
 	 * 
 	 * @param c The class to check
 	 * @return true by default
@@ -74,7 +74,7 @@ public abstract class YggdrasilSerializer<T> implements ClassResolver {
 	/**
 	 * Deserialises an object.
 	 * <p>
-	 * Use <tt>fields.{@link Fields#setFields(Object, Yggdrasil) setFields}(o, yggdrasil);</tt> to emulate the default behaviour.
+	 * Use <tt>fields.{@link Fields#setFields(Object) setFields}(o);</tt> to emulate the default behaviour.
 	 * 
 	 * @param o The object to deserialise as returned by {@link #newInstance(Class)}.
 	 * @param fields The fields read from stream

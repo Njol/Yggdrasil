@@ -15,7 +15,7 @@
  *  along with Skript.  If not, see <http://www.gnu.org/licenses/>.
  * 
  * 
- * Copyright 2013 Peter Güttinger
+ * Copyright 2013-2014 Peter Güttinger
  * 
  */
 
@@ -37,10 +37,10 @@ import ch.njol.yggdrasil.YggdrasilSerializable.YggdrasilExtendedSerializable;
 
 public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 	
-	protected final Yggdrasil y;
+	protected final Yggdrasil yggdrasil;
 	
-	protected YggdrasilOutputStream(final Yggdrasil y) {
-		this.y = y;
+	protected YggdrasilOutputStream(final Yggdrasil yggdrasil) {
+		this.yggdrasil = yggdrasil;
 	}
 	
 	// Tag
@@ -123,13 +123,13 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 		writeTag(T_ENUM);
 		final Class<?> c = o.getDeclaringClass();
 		assert c != null;
-		writeEnumType(y.getID(c));
+		writeEnumType(yggdrasil.getID(c));
 		writeEnumID(Yggdrasil.getID(o));
 	}
 	
 	private final void writeEnum(final PseudoEnum<?> o) throws IOException {
 		writeTag(T_ENUM);
-		writeEnumType(y.getID(o.getDeclaringClass()));
+		writeEnumType(yggdrasil.getID(o.getDeclaringClass()));
 		writeEnumID(o.name());
 	}
 	
@@ -166,10 +166,10 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 	private final void writeGenericObject(final Object o, int ref) throws IOException {
 		final Class<?> c = o.getClass();
 		assert c != null;
-		if (!y.isSerializable(c))
+		if (!yggdrasil.isSerializable(c))
 			throw new NotSerializableException(c.getName());
 		final Fields fields;
-		final YggdrasilSerializer s = y.getSerializer(c);
+		final YggdrasilSerializer s = yggdrasil.getSerializer(c);
 		if (s != null) {
 			fields = s.serialize(o);
 			if (fields == null)
@@ -183,13 +183,13 @@ public abstract class YggdrasilOutputStream implements Flushable, Closeable {
 			if (fields == null)
 				throw new YggdrasilException("The serialize() method of " + c + " returned null");
 		} else {
-			fields = new Fields(o);
+			fields = new Fields(o, yggdrasil);
 		}
 		if (fields.size() > Short.MAX_VALUE)
 			throw new YggdrasilException("Class " + c.getCanonicalName() + " has too many fields (" + fields.size() + ")");
 		
 		writeTag(T_OBJECT);
-		writeObjectType(y.getID(c));
+		writeObjectType(yggdrasil.getID(c));
 		writeNumFields((short) fields.size());
 		for (final FieldContext f : fields) {
 			writeFieldID(f.id);

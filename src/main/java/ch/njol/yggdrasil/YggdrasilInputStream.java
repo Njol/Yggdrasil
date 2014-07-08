@@ -15,7 +15,7 @@
  *  along with Skript.  If not, see <http://www.gnu.org/licenses/>.
  * 
  * 
- * Copyright 2013 Peter Güttinger
+ * Copyright 2013-2014 Peter Güttinger
  * 
  */
 
@@ -36,10 +36,10 @@ import ch.njol.yggdrasil.YggdrasilSerializable.YggdrasilExtendedSerializable;
 
 public abstract class YggdrasilInputStream implements Closeable {
 	
-	protected final Yggdrasil y;
+	protected final Yggdrasil yggdrasil;
 	
-	protected YggdrasilInputStream(final Yggdrasil y) {
-		this.y = y;
+	protected YggdrasilInputStream(final Yggdrasil yggdrasil) {
+		this.yggdrasil = yggdrasil;
 	}
 	
 	// Tag
@@ -118,7 +118,7 @@ public abstract class YggdrasilInputStream implements Closeable {
 	protected abstract String readFieldID() throws IOException;
 	
 	private final Fields readFields() throws IOException {
-		final Fields fields = new Fields();
+		final Fields fields = new Fields(yggdrasil);
 		final short numFields = readNumFields();
 		for (int i = 0; i < numFields; i++) {
 			final String id = readFieldID();
@@ -186,7 +186,7 @@ public abstract class YggdrasilInputStream implements Closeable {
 				break;
 			case T_OBJECT: {
 				final Class<?> c = readObjectType();
-				final YggdrasilSerializer s = y.getSerializer(c);
+				final YggdrasilSerializer s = yggdrasil.getSerializer(c);
 				if (s != null && !s.canBeInstantiated(c)) {
 					final int ref = readObjects.size();
 					readObjects.add(null);
@@ -196,7 +196,7 @@ public abstract class YggdrasilInputStream implements Closeable {
 						throw new YggdrasilException("YggdrasilSerializer " + s + " returned null from deserialize(" + c + "," + fields + ")");
 					readObjects.set(ref, o);
 				} else {
-					o = y.newInstance(c);
+					o = yggdrasil.newInstance(c);
 					if (o == null)
 						throw new StreamCorruptedException();
 					readObjects.add(o);
@@ -206,7 +206,7 @@ public abstract class YggdrasilInputStream implements Closeable {
 					} else if (o instanceof YggdrasilExtendedSerializable) {
 						((YggdrasilExtendedSerializable) o).deserialize(fields);
 					} else {
-						fields.setFields(o, y);
+						fields.setFields(o);
 					}
 				}
 				return o;

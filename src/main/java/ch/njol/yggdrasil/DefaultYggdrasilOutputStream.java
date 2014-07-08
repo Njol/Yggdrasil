@@ -15,7 +15,7 @@
  *  along with Skript.  If not, see <http://www.gnu.org/licenses/>.
  * 
  * 
- * Copyright 2013 Peter Güttinger
+ * Copyright 2013-2014 Peter Güttinger
  * 
  */
 
@@ -25,10 +25,13 @@ import static ch.njol.yggdrasil.Tag.*;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.util.HashMap;
 
 public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
+	
+	@SuppressWarnings("null")
+	private final static Charset UTF_8 = Charset.forName("UTF-8");
 	
 	private final OutputStream out;
 	
@@ -69,7 +72,7 @@ public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
 		} else {
 			if (nextShortStringID < 0)
 				throw new YggdrasilException("Too many field names/class IDs (max: " + Integer.MAX_VALUE + ")");
-			final byte[] d = s.getBytes(StandardCharsets.UTF_8);
+			final byte[] d = s.getBytes(UTF_8);
 			if (d.length >= (T_REFERENCE.tag & 0xFF))
 				throw new YggdrasilException("Field name or Class ID too long: " + s);
 			write(d.length);
@@ -183,7 +186,7 @@ public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
 	
 	@Override
 	protected void writeStringValue(final String s) throws IOException {
-		final byte[] d = s.getBytes(StandardCharsets.UTF_8);
+		final byte[] d = s.getBytes(UTF_8);
 		writeUnsignedInt(d.length);
 		out.write(d);
 	}
@@ -221,7 +224,7 @@ public final class DefaultYggdrasilOutputStream extends YggdrasilOutputStream {
 			case T_OBJECT:
 			case T_ENUM:
 				writeTag(t);
-				writeShortString(y.getID(c));
+				writeShortString(yggdrasil.getID(c));
 				break;
 			case T_BOOLEAN:
 			case T_BOOLEAN_OBJ:

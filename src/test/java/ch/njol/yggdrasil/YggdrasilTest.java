@@ -145,7 +145,7 @@ public class YggdrasilTest {
 		
 		@Override
 		public void deserialize(final Fields fields) throws StreamCorruptedException, NotSerializableException {
-			fields.setFields(this, y);
+			fields.setFields(this);
 			assert !ok;
 			if (someFinalInt != DEFAULT)
 				ok = true;
@@ -218,8 +218,8 @@ public class YggdrasilTest {
 	// random objects
 	/* private constructor is tested -> */@SuppressWarnings("synthetic-access")
 	final Object[] random = {
-			1, .5, true, 'a', "abc", "multi\nline\r\nstring\rwith\t\n\r\ttabs \u2001\nand\n\u00A0other\u2000\nwhitespace", 2l, (byte) -1, (short) 124, Float.POSITIVE_INFINITY,
-			Byte.MIN_VALUE, Byte.MAX_VALUE, Short.MIN_VALUE, Short.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE,
+			1, .5, true, 'a', "abc", "multi\nline\r\nstring\rwith\t\n\r\ttabs \u2001\nand\n\u00A0other\u2000\nwhitespace\0-\0", 2l, (byte) -1, (short) 124, Float.POSITIVE_INFINITY,
+			Byte.MIN_VALUE, Byte.MAX_VALUE, (byte) -1, Short.MIN_VALUE, Short.MAX_VALUE, (short) -1, Integer.MIN_VALUE, Integer.MAX_VALUE, -1, Long.MIN_VALUE, Long.MAX_VALUE, -1L,
 			Float.MIN_NORMAL, Float.MIN_VALUE, Float.NEGATIVE_INFINITY, -Float.MAX_VALUE, Double.MIN_NORMAL, Double.MIN_VALUE, Double.NEGATIVE_INFINITY, -Double.MAX_VALUE,
 			(byte) 0x12, (short) 0x1234, 0x12345678, 0x123456789abcdef0L, Float.intBitsToFloat(0x12345678), Double.longBitsToDouble(0x123456789abcdef0L),
 			
@@ -362,19 +362,15 @@ public class YggdrasilTest {
 		if (o1.getClass() != o2.getClass())
 			return false;
 		if (o1.getClass().isArray()) {
-			if (o1 instanceof Object[]) {
-				return Arrays.deepEquals((Object[]) o1, (Object[]) o2);
-			} else {
-				final int l1 = Array.getLength(o1);
-				final int l2 = Array.getLength(o2);
-				if (l1 != l2)
+			final int l1 = Array.getLength(o1);
+			final int l2 = Array.getLength(o2);
+			if (l1 != l2)
+				return false;
+			for (int i = 0; i < l1; i++) {
+				if (!equals(Array.get(o1, i), Array.get(o2, i)))
 					return false;
-				for (int i = 0; i < l1; i++) {
-					if (!Array.get(o1, i).equals(Array.get(o2, i)))
-						return false;
-				}
-				return true;
 			}
+			return true;
 		} else if (o1 instanceof Collection) {
 			final Iterator<?> i1 = ((Collection<?>) o1).iterator(), i2 = ((Collection<?>) o2).iterator();
 			while (i1.hasNext()) {

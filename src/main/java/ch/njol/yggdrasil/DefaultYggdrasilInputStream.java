@@ -15,7 +15,7 @@
  *  along with Skript.  If not, see <http://www.gnu.org/licenses/>.
  * 
  * 
- * Copyright 2013 Peter Güttinger
+ * Copyright 2013-2014 Peter Güttinger
  * 
  */
 
@@ -28,7 +28,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.StreamCorruptedException;
 import java.lang.reflect.Array;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,6 +39,9 @@ import org.eclipse.jdt.annotation.NonNull;
 // _x(): read data only (e.g. contents)
 
 public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
+	
+	@SuppressWarnings("null")
+	private final static Charset UTF_8 = Charset.forName("UTF-8");
 	
 	private final short version;
 	
@@ -94,7 +97,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 		} else {
 			final byte[] d = new byte[length];
 			readFully(d);
-			final String s = new String(d, StandardCharsets.UTF_8);
+			final String s = new String(d, UTF_8);
 			if (length > 4)
 				readShortStrings.add(s);
 			return s;
@@ -215,7 +218,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 		final int length = readUnsignedInt();
 		final byte[] d = new byte[length];
 		readFully(d);
-		return new String(d, StandardCharsets.UTF_8);
+		return new String(d, UTF_8);
 	}
 	
 	// Array
@@ -234,7 +237,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 	
 	@Override
 	protected Class<?> readEnumType() throws IOException {
-		return y.getClass(readShortString());
+		return yggdrasil.getClass(readShortString());
 	}
 	
 	@Override
@@ -256,7 +259,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 		switch (type) {
 			case T_OBJECT:
 			case T_ENUM:
-				c = y.getClass(readShortString());
+				c = yggdrasil.getClass(readShortString());
 				break;
 			case T_BOOLEAN:
 			case T_BOOLEAN_OBJ:
@@ -302,7 +305,7 @@ public final class DefaultYggdrasilInputStream extends YggdrasilInputStream {
 	
 	@Override
 	protected Class<?> readObjectType() throws IOException {
-		return y.getClass(readShortString());
+		return yggdrasil.getClass(readShortString());
 	}
 	
 	@Override

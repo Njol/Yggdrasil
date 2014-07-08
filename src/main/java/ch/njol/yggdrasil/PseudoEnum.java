@@ -1,10 +1,14 @@
 package ch.njol.yggdrasil;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import javax.annotation.concurrent.ThreadSafe;
 
 import org.eclipse.jdt.annotation.Nullable;
 
@@ -19,6 +23,7 @@ import org.eclipse.jdt.annotation.Nullable;
  * 
  * @author Peter Güttinger
  */
+@ThreadSafe
 public abstract class PseudoEnum<T extends PseudoEnum<T>> {
 	
 	private final String name;
@@ -26,15 +31,24 @@ public abstract class PseudoEnum<T extends PseudoEnum<T>> {
 	
 	private final Info<T> info;
 	
+	/**
+	 * @param name The unique name of this constant.
+	 * @throws IllegalArgumentException If the given name is already in use.
+	 */
 	@SuppressWarnings({"unchecked", "null"})
-	protected PseudoEnum(final String name) {
+	protected PseudoEnum(final String name) throws IllegalArgumentException {
 		this.name = name;
 		info = getInfo(getClass());
-		if (info.map.containsKey(name))
-			throw new IllegalArgumentException("Duplicate name '" + name + "'");
-		ordinal = info.values.size();
-		info.values.add((T) this);
-		info.map.put(name, (T) this);
+		info.writeLock.lock();
+		try {
+			if (info.map.containsKey(name))
+				throw new IllegalArgumentException("Duplicate name '" + name + "'");
+			ordinal = info.values.size();
+			info.values.add((T) this);
+			info.map.put(name, (T) this);
+		} finally {
+			info.writeLock.unlock();
+		}
 	}
 	
 	/**
@@ -70,11 +84,11 @@ public abstract class PseudoEnum<T extends PseudoEnum<T>> {
 	}
 	
 	/**
-	 * Uses {@link System#identityHashCode(Object)}
+	 * Returns {@link #ordinal()}, i.e. distinct hash codes for distinct constants.
 	 */
 	@Override
 	public final int hashCode() {
-		return System.identityHashCode(this);
+		return ordinal;
 	}
 	
 	/**
@@ -114,39 +128,50 @@ public abstract class PseudoEnum<T extends PseudoEnum<T>> {
 	 * @return The pseudo-enum class of the given class.
 	 * @see Enum#getDeclaringClass()
 	 */
-	@SuppressWarnings("unchecked")
 	public final static <T extends PseudoEnum<T>> Class<? super T> getDeclaringClass(final Class<T> type) {
-		Class<?> c = type;
+		Class<? super T> c = type;
 		while (c.isAnonymousClass())
 			c = c.getSuperclass();
-		return (Class<? super T>) c;
+		return c;
 	}
 	
 	/**
-	 * Returns all constants registered so far, ordered by their {@link #ordinal() id} (i.e. <tt>c.values().get(c.ordinal()) == c</tt> is true for any constant c).
+	 * Returns all constants registered so far, ordered by their {@link #ordinal() id} (i.e. <tt>c.values()[c.ordinal()] == c</tt> is true for any constant c).
 	 * <p>
-	 * This method returns an {@link Collections#unmodifiableList(List) unmodifiable view} of the internal list.
+	 * The returned list is a copy of the internal list at the time this method was called.
+	 * <p>
+	 * Please note that you
 	 * 
 	 * @return All constants registered so far.
 	 * @see Enum#valueOf(Class, String)
 	 */
-	@SuppressWarnings("null")
 	public final List<T> values() {
-		return Collections.unmodifiableList(info.values);
+		return values(getDeclaringClass(), info);
 	}
 	
 	/**
-	 * Returns all constants of the given class registered so far, ordered by their {@link #ordinal() id} (i.e. <tt>c.values().get(c.ordinal()) == c</tt> is true for any constant
+	 * Returns all constants of the given class registered so far, ordered by their {@link #ordinal() id} (i.e. <tt>c.values()[c.ordinal()] == c</tt> is true for any constant
 	 * c).
 	 * <p>
-	 * This method returns an {@link Collections#unmodifiableList(List) unmodifiable view} of the internal list.
+	 * The returned list is a copy of the internal list at the time this method was called.
 	 * 
 	 * @return All constants registered so far.
+	 * @throws IllegalArgumentException If <tt>{@link #getDeclaringClass(Class) getDeclaringClass}(c) != c</tt> (i.e. if the given class is anonymous).
 	 * @see Enum#valueOf(Class, String)
 	 */
-	@SuppressWarnings("null")
-	public final static <T extends PseudoEnum<T>> List<T> values(final Class<T> c) {
-		return Collections.unmodifiableList(getInfo(c).values);
+	public final static <T extends PseudoEnum<T>> List<T> values(final Class<T> c) throws IllegalArgumentException {
+		if (c != getDeclaringClass(c))
+			throw new IllegalArgumentException(c + " != " + getDeclaringClass(c));
+		return values(c, getInfo(c));
+	}
+	
+	private final static <T extends PseudoEnum<T>> List<T> values(final Class<T> c, final Info<T> info) {
+		info.readLock.lock();
+		try {
+			return new ArrayList<T>(info.values);
+		} finally {
+			info.readLock.unlock();
+		}
 	}
 	
 	/**
@@ -155,17 +180,28 @@ public abstract class PseudoEnum<T extends PseudoEnum<T>> {
 	 * @param id The constant's ID
 	 * @return The constant with the given ID.
 	 * @throws IndexOutOfBoundsException if ID is < 0 or >= {@link #numConstants()}
+	 * @see #valueOf(String)
 	 */
 	@SuppressWarnings("null")
 	public final T getConstant(final int id) throws IndexOutOfBoundsException {
-		return info.values.get(id);
+		info.readLock.lock();
+		try {
+			return info.values.get(id);
+		} finally {
+			info.readLock.unlock();
+		}
 	}
 	
 	/**
 	 * @return How many constants are currently registered
 	 */
 	public final int numConstants() {
-		return info.values.size();
+		info.readLock.lock();
+		try {
+			return info.values.size();
+		} finally {
+			info.readLock.unlock();
+		}
 	}
 	
 	/**
@@ -175,7 +211,12 @@ public abstract class PseudoEnum<T extends PseudoEnum<T>> {
 	 */
 	@Nullable
 	public final T valueOf(final String name) {
-		return info.map.get(name);
+		info.readLock.lock();
+		try {
+			return info.map.get(name);
+		} finally {
+			info.readLock.unlock();
+		}
 	}
 	
 	/**
@@ -186,23 +227,38 @@ public abstract class PseudoEnum<T extends PseudoEnum<T>> {
 	 */
 	@Nullable
 	public final static <T extends PseudoEnum<T>> T valueOf(final Class<T> c, final String name) {
-		return getInfo(c).map.get(name);
+		final Info<T> info = getInfo(c);
+		info.readLock.lock();
+		try {
+			return info.map.get(name);
+		} finally {
+			info.readLock.unlock();
+		}
 	}
 	
+	@SuppressWarnings("null")
 	private final static class Info<T extends PseudoEnum<T>> {
 		final List<T> values = new ArrayList<T>();
 		final Map<String, T> map = new HashMap<String, T>();
 		
+		final ReadWriteLock lock = new ReentrantReadWriteLock(true);
+		final Lock readLock = lock.readLock(), writeLock = lock.writeLock();
+		
 		public Info() {}
 	}
 	
-	private final static <T extends PseudoEnum<T>> Info<T> getInfo(final Class<T> c) {
-		Info<T> info = (Info<T>) infos.get(getDeclaringClass(c));
-		if (info == null)
-			infos.put(c, info = new Info<T>());
-		return info;
-	}
-	
+	/**
+	 * Must be synchronised
+	 */
 	private final static Map<Class<? extends PseudoEnum<?>>, Info<?>> infos = new HashMap<Class<? extends PseudoEnum<?>>, Info<?>>();
+	
+	private final static <T extends PseudoEnum<T>> Info<T> getInfo(final Class<T> c) {
+		synchronized (infos) {
+			Info<T> info = (Info<T>) infos.get(getDeclaringClass(c));
+			if (info == null)
+				infos.put(c, info = new Info<T>());
+			return info;
+		}
+	}
 	
 }

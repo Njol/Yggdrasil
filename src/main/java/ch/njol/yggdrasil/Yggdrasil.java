@@ -15,7 +15,7 @@
  *  along with Skript.  If not, see <http://www.gnu.org/licenses/>.
  * 
  * 
- * Copyright 2013 Peter Güttinger
+ * Copyright 2013-2014 Peter Güttinger
  * 
  */
 
@@ -35,6 +35,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.annotation.concurrent.NotThreadSafe;
+
 import org.eclipse.jdt.annotation.Nullable;
 
 import ch.njol.yggdrasil.Fields.FieldContext;
@@ -53,7 +55,7 @@ import ch.njol.yggdrasil.xml.YggXMLOutputStream;
  * <p>
  * <b>Default behaviour</b>
  * <p>
- * A Java object can be serialised and deserialised if it is a primitive, a primitive wrapper, a Strings, an enum or {@link PseudoEnum} (both require an ID), or its class meets all
+ * A Java object can be serialised and deserialised if it is a primitive, a primitive wrapper, a String, an enum or {@link PseudoEnum} (both require an ID), or its class meets all
  * of the following requirements:
  * <ul>
  * <li>It implements {@link YggdrasilSerializable}
@@ -75,6 +77,7 @@ import ch.njol.yggdrasil.xml.YggXMLOutputStream;
  * @author Peter Güttinger
  */
 @SuppressWarnings("deprecation")
+@NotThreadSafe
 public final class Yggdrasil {
 	
 	/**
@@ -329,7 +332,7 @@ public final class Yggdrasil {
 		if (s != null) {
 			if (!s.canBeInstantiated(c)) { // only used by isSerializable - return null if OK, throw an YggdrasilException if not
 				try {
-					final Object o = s.deserialize(c, new Fields());
+					final Object o = s.deserialize(c, new Fields(this));
 					if (o != null)
 						return null;
 					throw new YggdrasilException("YggdrasilSerializer " + s + " returned null from deserialize(" + c + ", new Fields())");
